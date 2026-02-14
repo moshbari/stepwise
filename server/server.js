@@ -86,6 +86,13 @@ function rebuildUserIndex(userId) {
   var userDir = path.join(GUIDES_DIR, userId);
   if (!fs.existsSync(userDir)) return;
 
+  // Look up user's name from users.json
+  var usersData = loadUsers();
+  var userName = "";
+  if (usersData.users[userId] && usersData.users[userId].name) {
+    userName = usersData.users[userId].name;
+  }
+
   var files = fs.readdirSync(userDir).filter(function(f) {
     return f.endsWith(".html") && f !== "index.html";
   });
@@ -117,12 +124,15 @@ function rebuildUserIndex(userId) {
   }
   videos.sort(function(a, b) { return new Date(b.savedAt) - new Date(a.savedAt); });
 
-  var html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>StepWise Guides</title>\n<style>\n' +
+  var pageTitle = userName ? userName + "'s StepWise Guides" : "StepWise Guides";
+
+  var html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>' + pageTitle.replace(/</g, "&lt;") + '</title>\n<style>\n' +
     '* { margin: 0; padding: 0; box-sizing: border-box; }\n' +
     'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }\n' +
     '.header { background: linear-gradient(135deg, #1e293b, #0f172a); border-bottom: 1px solid #334155; padding: 40px 20px; text-align: center; }\n' +
     '.header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }\n' +
     '.header h1 em { background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-style: normal; }\n' +
+    '.header .user-name { font-size: 20px; font-weight: 600; color: #f59e0b; margin-bottom: 4px; }\n' +
     '.header p { color: #94a3b8; font-size: 14px; }\n' +
     '.container { max-width: 800px; margin: 0 auto; padding: 30px 20px; }\n' +
     '.top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }\n' +
@@ -148,7 +158,7 @@ function rebuildUserIndex(userId) {
     '.video-card { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: all 0.2s; cursor: pointer; text-decoration: none; display: block; }\n' +
     '.video-card:hover { border-color: #6366f1; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.1); }\n' +
     '</style>\n</head>\n<body>\n' +
-    '<div class="header"><h1><em>StepWise</em> Guides</h1><p>Step-by-step tutorials and documentation</p></div>\n' +
+    '<div class="header">' + (userName ? '<div class="user-name">' + userName.replace(/</g, "&lt;") + '\'s</div>' : '') + '<h1><em>StepWise</em> Guides</h1><p>Step-by-step tutorials and documentation</p></div>\n' +
     '<div class="container" id="container">\n';
 
   if (guides.length === 0 && videos.length === 0) {
