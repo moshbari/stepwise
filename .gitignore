@@ -1,0 +1,5 @@
+node_modules/
+publish-config.json
+deploy-config.json
+*.bak
+.DS_Store
