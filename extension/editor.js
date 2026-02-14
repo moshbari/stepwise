@@ -2795,6 +2795,7 @@ function pollVideoProgress(vpsUrl, jobId) {
       // Show GHL status — keep modal open until user sees the link
       if (data.ghlUrl) {
         showGHLLink(data.ghlUrl);
+        saveVideoToServer(data.ghlUrl);
       } else if (data.ghlError) {
         document.getElementById("videoModalMsg").innerHTML = "\u2705 Video downloaded to your computer.<br><br>\u26a0\ufe0f GHL upload issue: " + data.ghlError;
       } else {
@@ -2853,6 +2854,44 @@ function showGHLLink(ghlUrl) {
     "\ud83d\udccb Copy Link</button>";
 }
 
+// Auto-save video GHL link to user's index page on the publish server
+function saveVideoToServer(ghlUrl) {
+  if (typeof chrome === "undefined" || !chrome.storage) return;
+
+  chrome.storage.local.get(["publishSecret"], function(result) {
+    var key = result.publishSecret || PUBLISH_SECRET;
+    if (!key) {
+      console.log("[VIDEO] No publish key — skipping server save");
+      return;
+    }
+
+    var title = document.getElementById("docTitle").value || "Untitled Video";
+
+    fetch(PUBLISH_API_URL + "/save-video", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + key
+      },
+      body: JSON.stringify({
+        title: title,
+        ghlUrl: ghlUrl
+      })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.success) {
+        console.log("[VIDEO] Saved to server: " + data.videoId);
+      } else {
+        console.log("[VIDEO] Server save failed: " + (data.error || "unknown"));
+      }
+    })
+    .catch(function(err) {
+      console.log("[VIDEO] Server save error: " + err.message);
+    });
+  });
+}
+
 // Poll for GHL URL — retries every 5 seconds, up to 12 tries (60 seconds)
 function pollGHLStatus(vpsUrl, jobId, attempt) {
   if (attempt >= 12) {
@@ -2869,8 +2908,9 @@ function pollGHLStatus(vpsUrl, jobId, attempt) {
     .then(function(data) {
       if (data.ghlUrl) {
         showGHLLink(data.ghlUrl);
+        saveVideoToServer(data.ghlUrl);
       } else if (data.ghlError) {
-        document.getElementById("videoModalMsg").innerHTML = 
+        document.getElementById("videoModalMsg").innerHTML =
           "\u2705 Video downloaded to your computer.<br><br>" +
           "\u26a0\ufe0f GHL upload issue: " + data.ghlError;
       } else {

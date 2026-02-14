@@ -109,6 +109,14 @@ function rebuildUserIndex(userId) {
 
   guides.sort(function(a, b) { return b.date - a.date; });
 
+  // Load videos
+  var videosFile = path.join(userDir, "videos.json");
+  var videos = [];
+  if (fs.existsSync(videosFile)) {
+    try { videos = JSON.parse(fs.readFileSync(videosFile, "utf8")); } catch(e) {}
+  }
+  videos.sort(function(a, b) { return new Date(b.savedAt) - new Date(a.savedAt); });
+
   var html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>StepWise Guides</title>\n<style>\n' +
     '* { margin: 0; padding: 0; box-sizing: border-box; }\n' +
     'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }\n' +
@@ -135,15 +143,25 @@ function rebuildUserIndex(userId) {
     '.empty p { font-size: 15px; }\n' +
     '.footer { text-align: center; padding: 30px; color: #334155; font-size: 11px; }\n' +
     '.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 12px 24px; border-radius: 10px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }\n' +
+    '.section-divider { margin: 40px 0 20px; padding-top: 20px; border-top: 1px solid #334155; }\n' +
+    '.section-label { font-size: 13px; color: #64748b; margin-bottom: 14px; }\n' +
+    '.video-card { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: all 0.2s; cursor: pointer; text-decoration: none; display: block; }\n' +
+    '.video-card:hover { border-color: #6366f1; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.1); }\n' +
     '</style>\n</head>\n<body>\n' +
     '<div class="header"><h1><em>StepWise</em> Guides</h1><p>Step-by-step tutorials and documentation</p></div>\n' +
     '<div class="container" id="container">\n';
 
-  if (guides.length === 0) {
-    html += '<div class="empty"><p>No guides published yet.</p></div>\n';
+  if (guides.length === 0 && videos.length === 0) {
+    html += '<div class="empty"><p>No guides or videos published yet.</p></div>\n';
   } else {
-    html += '<div class="top-bar"><div class="count">' + guides.length + ' guide' + (guides.length === 1 ? '' : 's') + ' published</div>' +
+    // Top bar with counts and manage button
+    var countParts = [];
+    if (guides.length > 0) countParts.push(guides.length + ' guide' + (guides.length === 1 ? '' : 's'));
+    if (videos.length > 0) countParts.push(videos.length + ' video' + (videos.length === 1 ? '' : 's'));
+    html += '<div class="top-bar"><div class="count">' + countParts.join(', ') + ' published</div>' +
       '<button class="manage-btn" id="manageBtn" onclick="toggleManage()">Manage</button></div>\n';
+
+    // Guides section
     guides.forEach(function(g) {
       var dateStr = g.date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
       var sizeKB = Math.round(g.size / 1024);
@@ -159,6 +177,27 @@ function rebuildUserIndex(userId) {
         '<button class="del-btn" onclick="deleteGuide(\'' + g.slug + '\', this)" title="Delete">&#x1F5D1;</button>\n' +
         '</div>\n';
     });
+
+    // Videos section
+    if (videos.length > 0) {
+      if (guides.length > 0) {
+        html += '<div class="section-divider"></div>\n';
+      }
+      html += '<div class="section-label">&#x1F3AC; Videos</div>\n';
+      videos.forEach(function(v) {
+        var dateStr = new Date(v.savedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+        html += '<div class="guide-row">\n' +
+          '<a class="video-card" href="' + v.ghlUrl.replace(/"/g, '&quot;') + '" target="_blank">\n' +
+          '  <div class="guide-title">' + (v.title || "Untitled Video").replace(/</g, "&lt;") + '</div>\n' +
+          '  <div class="guide-meta">\n' +
+          '    <i>&#x1F4C5; ' + dateStr + '</i>\n' +
+          '    <i>&#x1F3AC; MP4 Video</i>\n' +
+          '  </div>\n' +
+          '</a>\n' +
+          '<button class="del-btn" onclick="deleteVideo(\'' + v.id + '\', this)" title="Delete">&#x1F5D1;</button>\n' +
+          '</div>\n';
+      });
+    }
   }
 
   html += '</div>\n<div class="toast" id="toast"></div>\n<div class="footer">Powered by StepWise</div>\n';
@@ -212,6 +251,20 @@ function rebuildUserIndex(userId) {
     '        showToast("Guide deleted!");\n' +
     '      } else { showToast("Delete failed: " + (d.error || "unknown")); btn.textContent = "\\u{1F5D1}"; }\n' +
     '    }).catch(function(e) { showToast("Error: " + e.message); btn.textContent = "\\u{1F5D1}"; });\n' +
+    '}\n\n' +
+    'function deleteVideo(videoId, btn) {\n' +
+    '  if (!confirm("Delete this video link permanently?")) return;\n' +
+    '  btn.textContent = "...";\n' +
+    '  fetch(apiUrl + "/delete-video/" + videoId, {\n' +
+    '    method: "DELETE",\n' +
+    '    headers: { "Authorization": "Bearer " + secretKey }\n' +
+    '  }).then(function(r) { return r.json(); })\n' +
+    '    .then(function(d) {\n' +
+    '      if (d.success) {\n' +
+    '        btn.closest(".guide-row").style.display = "none";\n' +
+    '        showToast("Video link deleted!");\n' +
+    '      } else { showToast("Delete failed: " + (d.error || "unknown")); btn.textContent = "\\u{1F5D1}"; }\n' +
+    '    }).catch(function(e) { showToast("Error: " + e.message); btn.textContent = "\\u{1F5D1}"; });\n' +
     '}\n' +
     '</script>\n';
 
@@ -219,7 +272,7 @@ function rebuildUserIndex(userId) {
 
   fs.writeFileSync(path.join(userDir, "index.html"), html, "utf8");
   fs.chmodSync(path.join(userDir, "index.html"), "644");
-  console.log("[INDEX] Rebuilt " + userId + " with " + guides.length + " guides");
+  console.log("[INDEX] Rebuilt " + userId + " with " + guides.length + " guides, " + videos.length + " videos");
 }
 
 // Read full request body
@@ -405,6 +458,104 @@ var server = http.createServer(async function(req, res) {
     console.log("[DELETE] " + userId + "/" + slugToDelete + ".html");
 
     // Rebuild this user's index page
+    rebuildUserIndex(userId);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  // === SAVE VIDEO: Store a video GHL link (user-scoped) ===
+  if (req.method === "POST" && req.url === "/save-video") {
+    try {
+      var authResult = authenticateUser(req);
+      if (!authResult) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+        return;
+      }
+
+      var userId = authResult.userId;
+      var body = await readBody(req);
+      var data = JSON.parse(body);
+
+      if (!data.ghlUrl) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: "Missing ghlUrl" }));
+        return;
+      }
+
+      var userDir = path.join(GUIDES_DIR, userId);
+      if (!fs.existsSync(userDir)) {
+        fs.mkdirSync(userDir, { recursive: true });
+      }
+
+      var videosFile = path.join(userDir, "videos.json");
+      var videos = [];
+      if (fs.existsSync(videosFile)) {
+        try { videos = JSON.parse(fs.readFileSync(videosFile, "utf8")); } catch(e) {}
+      }
+
+      var videoId = "vid_" + Date.now();
+      videos.push({
+        id: videoId,
+        title: data.title || "Untitled Video",
+        ghlUrl: data.ghlUrl,
+        savedAt: new Date().toISOString()
+      });
+
+      fs.writeFileSync(videosFile, JSON.stringify(videos, null, 2), "utf8");
+      fs.chmodSync(videosFile, "644");
+
+      rebuildUserIndex(userId);
+
+      console.log("[VIDEO] " + userId + " saved video: " + videoId);
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, videoId: videoId }));
+    } catch(err) {
+      console.error("[ERROR]", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // === DELETE VIDEO: Remove a video link (user-scoped) ===
+  if (req.method === "DELETE" && req.url.startsWith("/delete-video/")) {
+    var authResult = authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+
+    var userId = authResult.userId;
+    var videoId = req.url.replace("/delete-video/", "");
+    var userDir = path.join(GUIDES_DIR, userId);
+    var videosFile = path.join(userDir, "videos.json");
+
+    if (!fs.existsSync(videosFile)) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Video not found" }));
+      return;
+    }
+
+    var videos = [];
+    try { videos = JSON.parse(fs.readFileSync(videosFile, "utf8")); } catch(e) {}
+
+    var originalLen = videos.length;
+    videos = videos.filter(function(v) { return v.id !== videoId; });
+
+    if (videos.length === originalLen) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Video not found" }));
+      return;
+    }
+
+    fs.writeFileSync(videosFile, JSON.stringify(videos, null, 2), "utf8");
+    console.log("[VIDEO] " + userId + " deleted video: " + videoId);
+
     rebuildUserIndex(userId);
 
     res.writeHead(200, { "Content-Type": "application/json" });
