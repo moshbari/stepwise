@@ -309,6 +309,24 @@ var server = http.createServer(async function(req, res) {
     return;
   }
 
+  // === ME: Get current user info from API key ===
+  if (req.method === "GET" && req.url === "/me") {
+    var authResult = authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      success: true,
+      userId: authResult.userId,
+      name: authResult.user.name || "Admin",
+      indexUrl: BASE_URL + "/" + authResult.userId + "/"
+    }));
+    return;
+  }
+
   // === REGISTER: Create a new user (admin only) ===
   if (req.method === "POST" && req.url === "/register") {
     try {

@@ -38,24 +38,54 @@ var ttsAudioCache = {}; // cache generated audio per step to avoid re-calling AP
 // ============================================================
 var PUBLISH_API_URL = "https://app.heychatmate.com/stepwise-api";
 var PUBLISH_SECRET = ""; // Will be loaded from chrome.storage settings
+var USER_INDEX_URL = ""; // Will be loaded after API key validation
 
 // Ensure user has entered their StepWise API key before using any feature
 async function ensureApiKey() {
   if (PUBLISH_SECRET) return true;
   if (typeof chrome !== "undefined" && chrome.storage) {
-    var result = await new Promise(function(resolve) { chrome.storage.local.get(["publishSecret"], resolve); });
+    var result = await new Promise(function(resolve) { chrome.storage.local.get(["publishSecret", "userIndexUrl"], resolve); });
     if (result.publishSecret) {
       PUBLISH_SECRET = result.publishSecret;
+      if (result.userIndexUrl) USER_INDEX_URL = result.userIndexUrl;
+      updateMyGuidesLink();
       return true;
     }
     var key = prompt("Enter your StepWise API key:\n(You received this from your admin — you only need to do this once)");
     if (!key) return false;
     PUBLISH_SECRET = key.trim();
     chrome.storage.local.set({ publishSecret: PUBLISH_SECRET });
+    // Fetch user info to get their index page URL
+    fetchAndStoreUserInfo();
     return true;
   }
   showToast("No API key available");
   return false;
+}
+
+// Fetch userId and index URL from server, store in chrome.storage
+function fetchAndStoreUserInfo() {
+  fetch(PUBLISH_API_URL + "/me", {
+    headers: { "Authorization": "Bearer " + PUBLISH_SECRET }
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.success && data.indexUrl) {
+      USER_INDEX_URL = data.indexUrl;
+      chrome.storage.local.set({ userIndexUrl: data.indexUrl, userName: data.name || "" });
+      updateMyGuidesLink();
+    }
+  })
+  .catch(function() {});
+}
+
+// Show/hide the "My Guides" link in the editor sidebar
+function updateMyGuidesLink() {
+  var link = document.getElementById("myGuidesLink");
+  if (link && USER_INDEX_URL) {
+    link.href = USER_INDEX_URL;
+    link.style.display = "block";
+  }
 }
 
 // ============================================================
@@ -174,6 +204,20 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     loadShareHistory();
+
+    // Load user info (index URL) if key exists
+    chrome.storage.local.get(["publishSecret", "userIndexUrl"], function(result) {
+      if (result.publishSecret) {
+        PUBLISH_SECRET = result.publishSecret;
+        if (result.userIndexUrl) {
+          USER_INDEX_URL = result.userIndexUrl;
+          updateMyGuidesLink();
+        } else {
+          // Key exists but no index URL yet — fetch it
+          fetchAndStoreUserInfo();
+        }
+      }
+    });
 
     // Check if already recording
     chrome.runtime.sendMessage({ action: "GET_STATUS" }, function(res) {

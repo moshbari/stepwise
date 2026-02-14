@@ -39,6 +39,9 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("downloadJsonBtn").addEventListener("click", downloadJSON);
   document.getElementById("clearBtn").addEventListener("click", clearAll);
 
+  // My Guides link
+  document.getElementById("myGuidesLink").addEventListener("click", openMyGuides);
+
   // Settings
   document.getElementById("settingsLink").addEventListener("click", openSettings);
   document.getElementById("settingsBackBtn").addEventListener("click", closeSettings);
@@ -51,6 +54,7 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("voiceToggleSettings").addEventListener("click", toggleVoice);
 
   loadSettings();
+  loadMyGuidesLink();
   refreshState();
 });
 
@@ -134,6 +138,40 @@ function updateVoiceToggles() {
   ["voiceToggle", "voiceToggleSettings"].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.classList.toggle("active", voiceEnabled);
+  });
+}
+
+// --- My Guides Link ---
+function loadMyGuidesLink() {
+  chrome.storage.local.get(["publishSecret", "userIndexUrl"], function(result) {
+    if (result.publishSecret && result.userIndexUrl) {
+      var link = document.getElementById("myGuidesLink");
+      if (link) link.style.display = "inline";
+    }
+  });
+}
+
+function openMyGuides() {
+  chrome.storage.local.get(["userIndexUrl"], function(result) {
+    if (result.userIndexUrl) {
+      chrome.tabs.create({ url: result.userIndexUrl });
+    } else {
+      // Try to fetch it
+      chrome.storage.local.get(["publishSecret"], function(r2) {
+        if (!r2.publishSecret) return;
+        fetch("https://app.heychatmate.com/stepwise-api/me", {
+          headers: { "Authorization": "Bearer " + r2.publishSecret }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.success && data.indexUrl) {
+            chrome.storage.local.set({ userIndexUrl: data.indexUrl });
+            chrome.tabs.create({ url: data.indexUrl });
+          }
+        })
+        .catch(function() {});
+      });
+    }
   });
 }
 
