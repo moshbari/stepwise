@@ -39,6 +39,25 @@ var ttsAudioCache = {}; // cache generated audio per step to avoid re-calling AP
 var PUBLISH_API_URL = "https://app.heychatmate.com/stepwise-api";
 var PUBLISH_SECRET = ""; // Will be loaded from chrome.storage settings
 
+// Ensure user has entered their StepWise API key before using any feature
+async function ensureApiKey() {
+  if (PUBLISH_SECRET) return true;
+  if (typeof chrome !== "undefined" && chrome.storage) {
+    var result = await new Promise(function(resolve) { chrome.storage.local.get(["publishSecret"], resolve); });
+    if (result.publishSecret) {
+      PUBLISH_SECRET = result.publishSecret;
+      return true;
+    }
+    var key = prompt("Enter your StepWise API key:\n(You received this from your admin — you only need to do this once)");
+    if (!key) return false;
+    PUBLISH_SECRET = key.trim();
+    chrome.storage.local.set({ publishSecret: PUBLISH_SECRET });
+    return true;
+  }
+  showToast("No API key available");
+  return false;
+}
+
 // ============================================================
 // INIT
 // ============================================================
@@ -1527,7 +1546,7 @@ function generateDescription(sid) {
   if (ta) { ta.value = desc; }
   showToast("Description generated!");
 }
-function generateAllDescriptions() { state.steps.forEach(function(s) { if (!s.description) generateDescription(s.id); }); showToast("All descriptions generated!"); }
+async function generateAllDescriptions() { if (!(await ensureApiKey())) return; state.steps.forEach(function(s) { if (!s.description) generateDescription(s.id); }); showToast("All descriptions generated!"); }
 
 // ============================================================
 // VOICE DICTATION IN EDITOR
@@ -1904,11 +1923,12 @@ function ttsStop() {
   }
 }
 
-function ttsPlayAll() {
+async function ttsPlayAll() {
   if (ttsPlayAllMode) {
     ttsStop();
     return;
   }
+  if (!(await ensureApiKey())) return;
   if (state.steps.length === 0) {
     showToast("No steps to play");
     return;
@@ -1977,7 +1997,8 @@ function resetTtsBtn(btn) {
 // AUTO-GENERATE TITLE & DESCRIPTION
 // ============================================================
 
-function autoGenerateTitle() {
+async function autoGenerateTitle() {
+  if (!(await ensureApiKey())) return;
   if (state.steps.length === 0) { showToast("Add some steps first"); return; }
 
   // Collect info from all steps
@@ -2457,23 +2478,7 @@ async function shareDoc() {
   var resultDiv = document.getElementById("shareResult");
   var urlInput = document.getElementById("shareUrlInput");
 
-  if (!PUBLISH_SECRET) {
-    // Try loading from chrome.storage
-    if (typeof chrome !== "undefined" && chrome.storage) {
-      var result = await new Promise(function(resolve) { chrome.storage.local.get(["publishSecret"], resolve); });
-      if (result.publishSecret) {
-        PUBLISH_SECRET = result.publishSecret;
-      } else {
-        var key = prompt("Enter your StepWise API key:\n(You received this from your admin — you only need to do this once)");
-        if (!key) return;
-        PUBLISH_SECRET = key.trim();
-        chrome.storage.local.set({ publishSecret: PUBLISH_SECRET });
-      }
-    } else {
-      showToast("Set PUBLISH_SECRET in editor.js");
-      return;
-    }
-  }
+  if (!(await ensureApiKey())) return;
 
   if (state.steps.length === 0) {
     showToast("No steps to publish");
@@ -2670,7 +2675,8 @@ var videoJobId = null;
 var videoPollTimer = null;
 var videoCancelled = false;
 
-function startVideoGeneration() {
+async function startVideoGeneration() {
+  if (!(await ensureApiKey())) return;
   if (!state.steps || state.steps.length === 0) {
     showToast("No steps to generate video from");
     return;
