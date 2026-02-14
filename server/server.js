@@ -472,6 +472,7 @@ var server = http.createServer(async function(req, res) {
         userId: uid,
         name: users.users[uid].name,
         email: users.users[uid].email,
+        apiKey: users.users[uid].apiKey,
         active: users.users[uid].active,
         guideCount: guideCount,
         createdAt: users.users[uid].createdAt
