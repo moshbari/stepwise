@@ -58,6 +58,10 @@ function deploy() {
     console.log("[DEPLOY] Copying server files...");
     execSync("cp " + REPO_DIR + "/server/server.js /root/stepwise-publish/server.js", { encoding: "utf8" });
 
+    // Copy admin dashboard to public folder
+    console.log("[DEPLOY] Copying admin dashboard...");
+    execSync("cp " + REPO_DIR + "/server/admin.html /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/admin.html", { encoding: "utf8" });
+
     // Restart the publish API
     console.log("[DEPLOY] Restarting stepwise-publish...");
     execSync("pm2 restart stepwise-publish", { encoding: "utf8" });

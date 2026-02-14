@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StepWise Admin</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+/* Header */
+.header { background: linear-gradient(135deg, #1e293b, #0f172a); border-bottom: 1px solid #334155; padding: 30px 20px; text-align: center; }
+.header h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+.header h1 em { background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-style: normal; }
+.header p { color: #94a3b8; font-size: 13px; }
+
+/* Container */
+.container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+
+/* Login Screen */
+.login-box { max-width: 400px; margin: 80px auto; background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 40px; text-align: center; }
+.login-box h2 { font-size: 20px; margin-bottom: 8px; }
+.login-box p { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+.login-box input { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; margin-bottom: 16px; outline: none; }
+.login-box input:focus { border-color: #f59e0b; }
+.login-box .error { color: #ef4444; font-size: 12px; margin-bottom: 12px; display: none; }
+
+/* Buttons */
+.btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-primary { background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+.btn-danger { background: #1e293b; border: 1px solid #ef4444; color: #ef4444; padding: 6px 14px; font-size: 12px; }
+.btn-danger:hover { background: #ef4444; color: #fff; }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Sections */
+.section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+.section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.section-title span { font-size: 18px; }
+
+/* Add Customer Form */
+.form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.form-row input { flex: 1; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 13px; outline: none; }
+.form-row input:focus { border-color: #f59e0b; }
+
+/* API Key Result */
+.key-result { display: none; background: #0f172a; border: 1px solid #22c55e; border-radius: 8px; padding: 16px; margin-top: 16px; }
+.key-result .label { font-size: 11px; color: #22c55e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.key-result .key-row { display: flex; gap: 8px; align-items: center; }
+.key-result input { flex: 1; padding: 10px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #f59e0b; font-size: 13px; font-family: monospace; outline: none; }
+.key-result .info { font-size: 11px; color: #94a3b8; margin-top: 10px; }
+.key-result .info a { color: #f59e0b; }
+
+/* User Table */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border-bottom: 1px solid #334155; }
+td { padding: 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+tr:hover td { background: rgba(245,158,11,0.03); }
+.user-name { font-weight: 600; color: #f1f5f9; }
+.user-email { color: #94a3b8; font-size: 12px; }
+.user-id { font-family: monospace; font-size: 11px; color: #64748b; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+.badge-active { background: rgba(34,197,94,0.15); color: #22c55e; }
+.badge-inactive { background: rgba(239,68,68,0.15); color: #ef4444; }
+.guide-count { font-weight: 600; color: #f59e0b; }
+.guide-link { color: #94a3b8; text-decoration: none; font-size: 12px; }
+.guide-link:hover { color: #f59e0b; }
+.date { color: #64748b; font-size: 12px; }
+.empty-state { text-align: center; padding: 40px; color: #475569; }
+
+/* Logout */
+.top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.top-bar .count { font-size: 13px; color: #64748b; }
+.logout-btn { background: none; border: 1px solid #334155; color: #94a3b8; padding: 6px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+.logout-btn:hover { border-color: #ef4444; color: #ef4444; }
+
+/* Toast */
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 12px 24px; border-radius: 10px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; }
+  table { font-size: 12px; }
+  th, td { padding: 8px 6px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><em>StepWise</em> Admin</h1>
+  <p>Manage your customers</p>
+</div>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <p>Enter your admin secret key to continue</p>
+    <input type="password" id="secretInput" placeholder="Paste your admin secret key..." onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="error" id="loginError">Invalid key. Please try again.</div>
+    <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">Sign In</button>
+  </div>
+</div>
+
+<!-- Dashboard (hidden until login) -->
+<div id="dashboard" style="display:none;">
+  <div class="container">
+    <div class="top-bar">
+      <div class="count" id="userCount"></div>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+
+    <!-- Add Customer -->
+    <div class="section">
+      <div class="section-title"><span>&#x2795;</span> Add New Customer</div>
+      <div class="form-row">
+        <input type="text" id="newName" placeholder="Customer name (required)">
+        <input type="email" id="newEmail" placeholder="Email (optional)">
+        <button class="btn btn-primary btn-sm" id="addBtn" onclick="addCustomer()">Create</button>
+      </div>
+      <div class="key-result" id="keyResult">
+        <div class="label">New customer created! Here's their API key:</div>
+        <div class="key-row">
+          <input type="text" id="newKeyDisplay" readonly>
+          <button class="btn btn-primary btn-sm" onclick="copyKey()">Copy</button>
+        </div>
+        <div class="info">
+          Give this key to the customer. Their guides page: <a id="newIndexLink" href="#" target="_blank"></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- User List -->
+    <div class="section">
+      <div class="section-title"><span>&#x1F465;</span> Customers</div>
+      <div id="userList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API = "https://app.heychatmate.com/stepwise-api";
+var adminKey = "";
+
+function showToast(msg) {
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  setTimeout(function() { t.style.display = "none"; }, 3000);
+}
+
+// === LOGIN ===
+async function doLogin() {
+  var key = document.getElementById("secretInput").value.trim();
+  if (!key) return;
+
+  var btn = document.getElementById("loginBtn");
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  document.getElementById("loginError").style.display = "none";
+
+  try {
+    var res = await fetch(API + "/admin/users", {
+      headers: { "Authorization": "Bearer " + key }
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      adminKey = key;
+      sessionStorage.setItem("sw_admin", key);
+      document.getElementById("loginScreen").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      renderUsers(data.users);
+    } else {
+      document.getElementById("loginError").style.display = "block";
+    }
+  } catch(e) {
+    document.getElementById("loginError").textContent = "Could not connect to server.";
+    document.getElementById("loginError").style.display = "block";
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Sign In";
+}
+
+function doLogout() {
+  adminKey = "";
+  sessionStorage.removeItem("sw_admin");
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("loginScreen").style.display = "block";
+  document.getElementById("secretInput").value = "";
+  document.getElementById("keyResult").style.display = "none";
+}
+
+// === AUTO LOGIN ===
+(function() {
+  var saved = sessionStorage.getItem("sw_admin");
+  if (saved) {
+    document.getElementById("secretInput").value = saved;
+    doLogin();
+  }
+})();
+
+// === RENDER USERS ===
+function renderUsers(users) {
+  var active = users.filter(function(u) { return u.active; }).length;
+  document.getElementById("userCount").textContent = users.length + " customer" + (users.length === 1 ? "" : "s") + " (" + active + " active)";
+
+  if (users.length === 0) {
+    document.getElementById("userList").innerHTML = '<div class="empty-state"><p>No customers yet. Add your first one above!</p></div>';
+    return;
+  }
+
+  // Sort newest first
+  users.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+
+  var html = '<table><thead><tr><th>Customer</th><th>Guides</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>';
+
+  users.forEach(function(u) {
+    var date = new Date(u.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    var badge = u.active
+      ? '<span class="badge badge-active">Active</span>'
+      : '<span class="badge badge-inactive">Inactive</span>';
+    var indexUrl = "https://app.heychatmate.com/stepwise/" + u.userId + "/";
+    var actionBtn = u.active
+      ? '<button class="btn btn-danger btn-sm" onclick="deactivateUser(\'' + u.userId + '\')">Deactivate</button>'
+      : '<span style="color:#64748b;font-size:11px;">Deactivated</span>';
+
+    html += '<tr>' +
+      '<td><div class="user-name">' + escHtml(u.name) + '</div><div class="user-email">' + escHtml(u.email || "—") + '</div><div class="user-id">' + u.userId + '</div></td>' +
+      '<td><span class="guide-count">' + (u.guideCount || 0) + '</span> <a class="guide-link" href="' + indexUrl + '" target="_blank">View</a></td>' +
+      '<td>' + badge + '</td>' +
+      '<td class="date">' + date + '</td>' +
+      '<td>' + actionBtn + '</td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById("userList").innerHTML = html;
+}
+
+// === ADD CUSTOMER ===
+async function addCustomer() {
+  var name = document.getElementById("newName").value.trim();
+  var email = document.getElementById("newEmail").value.trim();
+
+  if (!name) {
+    showToast("Customer name is required");
+    return;
+  }
+
+  var btn = document.getElementById("addBtn");
+  btn.disabled = true;
+  btn.textContent = "Creating...";
+
+  try {
+    var res = await fetch(API + "/register", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + adminKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: name, email: email })
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      // Show the key
+      document.getElementById("newKeyDisplay").value = data.apiKey;
+      document.getElementById("newIndexLink").href = data.indexUrl;
+      document.getElementById("newIndexLink").textContent = data.indexUrl;
+      document.getElementById("keyResult").style.display = "block";
+
+      // Clear form
+      document.getElementById("newName").value = "";
+      document.getElementById("newEmail").value = "";
+
+      showToast("Customer created!");
+
+      // Refresh user list
+      refreshUsers();
+    } else {
+      showToast("Error: " + (data.error || "Failed"));
+    }
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Create";
+}
+
+function copyKey() {
+  var input = document.getElementById("newKeyDisplay");
+  navigator.clipboard.writeText(input.value).then(function() {
+    showToast("API key copied!");
+  });
+}
+
+// === DEACTIVATE USER ===
+async function deactivateUser(userId) {
+  if (!confirm("Deactivate this customer? Their guides will stay online but they won't be able to publish or delete.")) return;
+
+  try {
+    var res = await fetch(API + "/admin/users/" + userId, {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      showToast("Customer deactivated");
+      refreshUsers();
+    } else {
+      showToast("Error: " + (data.error || "Failed"));
+    }
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+}
+
+// === REFRESH ===
+async function refreshUsers() {
+  try {
+    var res = await fetch(API + "/admin/users", {
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+    if (data.success) {
+      renderUsers(data.users);
+    }
+  } catch(e) {}
+}
+
+// === UTILS ===
+function escHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+</script>
+
+</body>
+</html>
