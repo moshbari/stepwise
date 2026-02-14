@@ -2464,7 +2464,7 @@ async function shareDoc() {
       if (result.publishSecret) {
         PUBLISH_SECRET = result.publishSecret;
       } else {
-        var key = prompt("Enter your Publish API secret key:\n(From your VPS setup — you only need to do this once)");
+        var key = prompt("Enter your StepWise API key:\n(You received this from your admin — you only need to do this once)");
         if (!key) return;
         PUBLISH_SECRET = key.trim();
         chrome.storage.local.set({ publishSecret: PUBLISH_SECRET });

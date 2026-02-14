@@ -69,12 +69,57 @@ Nginx custom config location:
 /home/heychatmate/conf/web/app.heychatmate.com/nginx.ssl.conf_custom
 ```
 
+## Multi-User System
+
+StepWise uses per-user API keys. Each user gets their own folder and index page.
+
+### How It Works
+- Admin creates users via `POST /register` (protected by admin secret from `publish-config.json`)
+- Each user gets a unique API key (`sk_live_...`) and userId (`user_xxxxxxxx`)
+- Guides are saved to `/stepwise/{userId}/guide.html`
+- Each user has their own index page at `/stepwise/{userId}/`
+- Users can only see/delete their own guides
+- The admin secret from `publish-config.json` still works (maps to userId `_admin`)
+
+### User Data
+Stored in `/root/stepwise-publish/users.json` (gitignored, chmod 600):
+```json
+{
+  "users": {
+    "user_a1b2c3d4": {
+      "apiKey": "sk_live_abc123...",
+      "name": "John Smith",
+      "email": "john@example.com",
+      "createdAt": "2026-02-14T10:00:00.000Z",
+      "active": true
+    }
+  }
+}
+```
+
+### Admin Workflow
+```bash
+# Create a customer
+curl -X POST https://app.heychatmate.com/stepwise-api/register \
+  -H "Authorization: Bearer ADMIN_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John Smith", "email": "john@example.com"}'
+
+# List all customers
+curl https://app.heychatmate.com/stepwise-api/admin/users \
+  -H "Authorization: Bearer ADMIN_SECRET"
+
+# Deactivate a customer (guides stay online, can't publish/delete)
+curl -X DELETE https://app.heychatmate.com/stepwise-api/admin/users/user_a1b2c3d4 \
+  -H "Authorization: Bearer ADMIN_SECRET"
+```
+
 ## Published Guides
 
-Guides are saved as static HTML files at:
-- **Server path:** /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/
-- **Public URL:** https://app.heychatmate.com/stepwise/
-- **Index page:** https://app.heychatmate.com/stepwise/ (auto-generated, has Manage button for deleting)
+Guides are saved as static HTML files in per-user folders:
+- **Server path:** /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/{userId}/
+- **Public URL:** https://app.heychatmate.com/stepwise/{userId}/guide-slug.html
+- **User index page:** https://app.heychatmate.com/stepwise/{userId}/ (auto-generated, shows only that user's guides)
 
 ## GitHub → Server Auto-Deploy
 
@@ -105,10 +150,10 @@ When code is pushed to the `main` branch on GitHub:
 
 ### How Publishing Works
 1. User clicks "Publish — Get Link" in editor
-2. Extension sends POST to https://app.heychatmate.com/stepwise-api/publish
-3. Server saves HTML file to /stepwise/ folder
-4. Server rebuilds index page
-5. Returns permanent URL to extension
+2. Extension sends POST to https://app.heychatmate.com/stepwise-api/publish with Bearer API key
+3. Server identifies user from API key, saves HTML file to /stepwise/{userId}/ folder
+4. Server rebuilds that user's index page
+5. Returns permanent URL (includes userId in path) to extension
 6. URL saved to publish history in chrome.storage
 
 ### Key Files
@@ -131,18 +176,31 @@ When code is pushed to the `main` branch on GitHub:
 
 ### Publish API (port 3600)
 
-**POST /publish** — Save a new guide
-- Header: `Authorization: Bearer <secret>`
-- Body: `{ "html": "<full html>", "title": "Guide Title", "slug": "optional-slug" }`
-- Returns: `{ "success": true, "url": "https://...", "slug": "guide-slug" }`
+**POST /register** — Create a new user (admin only)
+- Header: `Authorization: Bearer <admin-secret>`
+- Body: `{ "name": "John Smith", "email": "john@example.com" }`
+- Returns: `{ "success": true, "userId": "user_xxx", "apiKey": "sk_live_xxx", "indexUrl": "..." }`
 
-**DELETE /delete/:slug** — Delete a guide
-- Header: `Authorization: Bearer <secret>`
+**POST /publish** — Save a new guide (user-scoped)
+- Header: `Authorization: Bearer <user-api-key>` (or admin secret)
+- Body: `{ "html": "<full html>", "title": "Guide Title", "slug": "optional-slug" }`
+- Returns: `{ "success": true, "url": "https://.../stepwise/{userId}/guide.html", "slug": "guide-slug" }`
+
+**DELETE /delete/:slug** — Delete a guide (user-scoped, only own guides)
+- Header: `Authorization: Bearer <user-api-key>` (or admin secret)
 - Returns: `{ "success": true }`
 
-**GET /list** — List all published guides
-- Header: `Authorization: Bearer <secret>`
+**GET /list** — List published guides (user-scoped, only own guides)
+- Header: `Authorization: Bearer <user-api-key>` (or admin secret)
 - Returns: `{ "success": true, "guides": [...] }`
+
+**GET /admin/users** — List all registered users (admin only)
+- Header: `Authorization: Bearer <admin-secret>`
+- Returns: `{ "success": true, "users": [...] }`
+
+**DELETE /admin/users/:userId** — Deactivate a user (admin only)
+- Header: `Authorization: Bearer <admin-secret>`
+- Returns: `{ "success": true, "message": "User deactivated" }`
 
 **GET /health** — Health check
 - Returns: `{ "status": "ok", "service": "stepwise-publish" }`
@@ -163,8 +221,9 @@ These are sensitive files on the server. They are gitignored:
 
 | File | Location | Contains |
 |---|---|---|
-| publish-config.json | /root/stepwise-publish/ | Publish API secret key |
+| publish-config.json | /root/stepwise-publish/ | Admin secret key |
 | deploy-config.json | /root/stepwise-deploy/ | Webhook secret |
+| users.json | /root/stepwise-publish/ | User accounts and API keys |
 
 ## Port Map — What's Safe to Use
 
@@ -204,8 +263,11 @@ Edit the `generateHTMLContent()` function in `editor.js` (around line 2426). Thi
 ### Adding a new API endpoint
 Edit `server/server.js`. Add a new route in the `http.createServer` callback. Follow the existing pattern for auth checking and JSON responses.
 
-### Rebuilding the index page
-The index page auto-rebuilds on every publish/delete. If you need to force it, restart the publish API: `pm2 restart stepwise-publish`
+### Rebuilding a user's index page
+Each user's index page auto-rebuilds on every publish/delete. If you need to force it, restart the publish API: `pm2 restart stepwise-publish`
+
+### Creating a new customer account
+Use the admin secret to call `/register`: `curl -X POST https://app.heychatmate.com/stepwise-api/register -H "Authorization: Bearer ADMIN_SECRET" -H "Content-Type: application/json" -d '{"name": "Customer Name", "email": "email@example.com"}'`
 
 ## Instructions for AI Assistants
 
@@ -225,6 +287,8 @@ The index page auto-rebuilds on every publish/delete. If you need to force it, r
 
 **DON'T:** Touch the video generator service (port 3500) unless asked.
 
-**DON'T:** Change the publish-config.json secret key — the user's extension has it saved.
+**DON'T:** Change the publish-config.json admin secret key — it's used for admin operations.
+
+**DON'T:** Modify users.json manually — use the `/register` and `/admin/users` API endpoints.
 
 **USER SKILL LEVEL:** Beginner. Explain everything simply. Use step-by-step instructions.

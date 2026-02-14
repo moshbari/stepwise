@@ -1,5 +1,6 @@
-// StepWise Publish API
+// StepWise Publish API — Multi-User
 // Receives HTML from the extension and saves it permanently
+// Each user gets their own folder and index page
 // Port: 3600
 
 const http = require("http");
@@ -25,9 +26,45 @@ if (fs.existsSync(CONFIG_FILE)) {
   console.log("\n========================================");
   console.log("  STEPWISE PUBLISH API - FIRST RUN");
   console.log("========================================");
-  console.log("Your secret key (save this!):");
+  console.log("Your admin secret key (save this!):");
   console.log(config.secret);
   console.log("========================================\n");
+}
+
+// === USERS CONFIG ===
+const USERS_FILE = path.join(__dirname, "users.json");
+
+function loadUsers() {
+  if (fs.existsSync(USERS_FILE)) {
+    return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  }
+  return { users: {} };
+}
+
+function saveUsers(data) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2), "utf8");
+  fs.chmodSync(USERS_FILE, "600");
+}
+
+// Authenticate by API key — returns { userId, user } or null
+function authenticateUser(req) {
+  var auth = req.headers["authorization"] || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  var apiKey = auth.replace("Bearer ", "");
+
+  // Check if it's the admin key (backward compat)
+  if (apiKey === config.secret) {
+    return { userId: "_admin", user: { name: "Admin", isAdmin: true } };
+  }
+
+  // Look up in users.json
+  var data = loadUsers();
+  for (var uid in data.users) {
+    if (data.users[uid].apiKey === apiKey && data.users[uid].active) {
+      return { userId: uid, user: data.users[uid] };
+    }
+  }
+  return null;
 }
 
 // Make sure guides folder exists
@@ -44,16 +81,19 @@ function makeSlug(title) {
     .substring(0, 80) || ("guide-" + Date.now());
 }
 
-// Auto-generate index.html listing all guides with delete capability
-function rebuildIndex() {
-  var files = fs.readdirSync(GUIDES_DIR).filter(function(f) {
+// Auto-generate per-user index.html listing their guides with delete capability
+function rebuildUserIndex(userId) {
+  var userDir = path.join(GUIDES_DIR, userId);
+  if (!fs.existsSync(userDir)) return;
+
+  var files = fs.readdirSync(userDir).filter(function(f) {
     return f.endsWith(".html") && f !== "index.html";
   });
 
   var guides = files.map(function(f) {
-    var stats = fs.statSync(path.join(GUIDES_DIR, f));
+    var stats = fs.statSync(path.join(userDir, f));
     var content = "";
-    try { content = fs.readFileSync(path.join(GUIDES_DIR, f), "utf8"); } catch(e) {}
+    try { content = fs.readFileSync(path.join(userDir, f), "utf8"); } catch(e) {}
     var titleMatch = content.match(/<title[^>]*>([^<]+)<\/title>/i);
     var displayTitle = titleMatch ? titleMatch[1] : f.replace(".html", "").replace(/-/g, " ");
     var stepCount = (content.match(/class="step-card"/g) || content.match(/class="step"/g) || []).length;
@@ -137,7 +177,7 @@ function rebuildIndex() {
     '  var btn = document.getElementById("manageBtn");\n' +
     '  var container = document.getElementById("container");\n' +
     '  if (!managing) {\n' +
-    '    var key = prompt("Enter your admin secret key:");\n' +
+    '    var key = prompt("Enter your API key:");\n' +
     '    if (!key) return;\n' +
     '    secretKey = key.trim();\n' +
     '    // Verify key with a list call\n' +
@@ -177,9 +217,9 @@ function rebuildIndex() {
 
   html += '</body>\n</html>';
 
-  fs.writeFileSync(path.join(GUIDES_DIR, "index.html"), html, "utf8");
-  fs.chmodSync(path.join(GUIDES_DIR, "index.html"), "644");
-  console.log("[INDEX] Rebuilt with " + guides.length + " guides");
+  fs.writeFileSync(path.join(userDir, "index.html"), html, "utf8");
+  fs.chmodSync(path.join(userDir, "index.html"), "644");
+  console.log("[INDEX] Rebuilt " + userId + " with " + guides.length + " guides");
 }
 
 // Read full request body
@@ -195,7 +235,7 @@ function readBody(req) {
 // CORS headers
 function setCORS(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
@@ -209,16 +249,83 @@ var server = http.createServer(async function(req, res) {
     return;
   }
 
-  // === PUBLISH: Save HTML guide ===
-  if (req.method === "POST" && req.url === "/publish") {
+  // === HEALTH CHECK ===
+  if (req.method === "GET" && req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", service: "stepwise-publish" }));
+    return;
+  }
+
+  // === REGISTER: Create a new user (admin only) ===
+  if (req.method === "POST" && req.url === "/register") {
     try {
       var auth = req.headers["authorization"] || "";
       if (auth !== "Bearer " + config.secret) {
         res.writeHead(401, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ success: false, error: "Invalid secret key" }));
+        res.end(JSON.stringify({ success: false, error: "Admin only" }));
         return;
       }
 
+      var body = await readBody(req);
+      var data = JSON.parse(body);
+
+      if (!data.name) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: "Name is required" }));
+        return;
+      }
+
+      var userId = "user_" + crypto.randomBytes(4).toString("hex");
+      var apiKey = "sk_live_" + crypto.randomBytes(24).toString("hex");
+
+      var users = loadUsers();
+      users.users[userId] = {
+        apiKey: apiKey,
+        name: data.name,
+        email: data.email || "",
+        createdAt: new Date().toISOString(),
+        active: true
+      };
+      saveUsers(users);
+
+      // Create user's guides directory
+      var userDir = path.join(GUIDES_DIR, userId);
+      if (!fs.existsSync(userDir)) {
+        fs.mkdirSync(userDir, { recursive: true });
+      }
+
+      // Build their initial (empty) index
+      rebuildUserIndex(userId);
+
+      console.log("[REGISTER] New user: " + userId + " (" + data.name + ")");
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: true,
+        userId: userId,
+        apiKey: apiKey,
+        indexUrl: BASE_URL + "/" + userId + "/",
+        message: "Give this API key to the customer"
+      }));
+    } catch(err) {
+      console.error("[ERROR]", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // === PUBLISH: Save HTML guide (user-scoped) ===
+  if (req.method === "POST" && req.url === "/publish") {
+    try {
+      var authResult = authenticateUser(req);
+      if (!authResult) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+        return;
+      }
+
+      var userId = authResult.userId;
       var body = await readBody(req);
       var data = JSON.parse(body);
 
@@ -228,29 +335,35 @@ var server = http.createServer(async function(req, res) {
         return;
       }
 
+      // Use user-specific directory
+      var userDir = path.join(GUIDES_DIR, userId);
+      if (!fs.existsSync(userDir)) {
+        fs.mkdirSync(userDir, { recursive: true });
+      }
+
       var slug = data.slug || makeSlug(data.title);
       var fileName = slug + ".html";
-      var filePath = path.join(GUIDES_DIR, fileName);
+      var filePath = path.join(userDir, fileName);
 
       // If file already exists, add a number
       if (fs.existsSync(filePath) && !data.overwrite) {
         var counter = 2;
-        while (fs.existsSync(path.join(GUIDES_DIR, slug + "-" + counter + ".html"))) {
+        while (fs.existsSync(path.join(userDir, slug + "-" + counter + ".html"))) {
           counter++;
         }
         fileName = slug + "-" + counter + ".html";
-        filePath = path.join(GUIDES_DIR, fileName);
+        filePath = path.join(userDir, fileName);
         slug = slug + "-" + counter;
       }
 
       fs.writeFileSync(filePath, data.html, "utf8");
       fs.chmodSync(filePath, "644");
 
-      // Rebuild the index page
-      rebuildIndex();
+      // Rebuild this user's index page
+      rebuildUserIndex(userId);
 
-      var url = BASE_URL + "/" + fileName;
-      console.log("[PUBLISH] " + fileName + " (" + Math.round(data.html.length / 1024) + " KB)");
+      var url = BASE_URL + "/" + userId + "/" + fileName;
+      console.log("[PUBLISH] " + userId + "/" + fileName + " (" + Math.round(data.html.length / 1024) + " KB)");
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
@@ -268,17 +381,19 @@ var server = http.createServer(async function(req, res) {
     return;
   }
 
-  // === DELETE: Remove a guide ===
+  // === DELETE: Remove a guide (user-scoped) ===
   if (req.method === "DELETE" && req.url.startsWith("/delete/")) {
-    var auth = req.headers["authorization"] || "";
-    if (auth !== "Bearer " + config.secret) {
+    var authResult = authenticateUser(req);
+    if (!authResult) {
       res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: false, error: "Invalid secret key" }));
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
       return;
     }
 
+    var userId = authResult.userId;
     var slugToDelete = req.url.replace("/delete/", "");
-    var fileToDelete = path.join(GUIDES_DIR, slugToDelete + ".html");
+    var userDir = path.join(GUIDES_DIR, userId);
+    var fileToDelete = path.join(userDir, slugToDelete + ".html");
 
     if (!fs.existsSync(fileToDelete)) {
       res.writeHead(404, { "Content-Type": "application/json" });
@@ -287,32 +402,43 @@ var server = http.createServer(async function(req, res) {
     }
 
     fs.unlinkSync(fileToDelete);
-    console.log("[DELETE] " + slugToDelete + ".html");
+    console.log("[DELETE] " + userId + "/" + slugToDelete + ".html");
 
-    // Rebuild the index page
-    rebuildIndex();
+    // Rebuild this user's index page
+    rebuildUserIndex(userId);
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true }));
     return;
   }
 
-  // === LIST: Show all published guides ===
+  // === LIST: Show user's published guides (user-scoped) ===
   if (req.method === "GET" && req.url === "/list") {
-    var auth = req.headers["authorization"] || "";
-    if (auth !== "Bearer " + config.secret) {
+    var authResult = authenticateUser(req);
+    if (!authResult) {
       res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: false, error: "Invalid secret key" }));
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
       return;
     }
 
-    var files = fs.readdirSync(GUIDES_DIR).filter(function(f) { return f.endsWith(".html"); });
+    var userId = authResult.userId;
+    var userDir = path.join(GUIDES_DIR, userId);
+
+    if (!fs.existsSync(userDir)) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, guides: [] }));
+      return;
+    }
+
+    var files = fs.readdirSync(userDir).filter(function(f) {
+      return f.endsWith(".html") && f !== "index.html";
+    });
     var guides = files.map(function(f) {
-      var stats = fs.statSync(path.join(GUIDES_DIR, f));
+      var stats = fs.statSync(path.join(userDir, f));
       return {
         fileName: f,
         slug: f.replace(".html", ""),
-        url: BASE_URL + "/" + f,
+        url: BASE_URL + "/" + userId + "/" + f,
         size: stats.size,
         publishedAt: stats.mtime.toISOString()
       };
@@ -323,10 +449,64 @@ var server = http.createServer(async function(req, res) {
     return;
   }
 
-  // === HEALTH CHECK ===
-  if (req.method === "GET" && req.url === "/health") {
+  // === ADMIN: List all users (admin only) ===
+  if (req.method === "GET" && req.url === "/admin/users") {
+    var auth = req.headers["authorization"] || "";
+    if (auth !== "Bearer " + config.secret) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Admin only" }));
+      return;
+    }
+
+    var users = loadUsers();
+    var userList = [];
+    for (var uid in users.users) {
+      var userDir = path.join(GUIDES_DIR, uid);
+      var guideCount = 0;
+      if (fs.existsSync(userDir)) {
+        guideCount = fs.readdirSync(userDir).filter(function(f) {
+          return f.endsWith(".html") && f !== "index.html";
+        }).length;
+      }
+      userList.push({
+        userId: uid,
+        name: users.users[uid].name,
+        email: users.users[uid].email,
+        active: users.users[uid].active,
+        guideCount: guideCount,
+        createdAt: users.users[uid].createdAt
+      });
+    }
+
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok", service: "stepwise-publish" }));
+    res.end(JSON.stringify({ success: true, users: userList }));
+    return;
+  }
+
+  // === ADMIN: Deactivate a user (admin only) ===
+  if (req.method === "DELETE" && req.url.startsWith("/admin/users/")) {
+    var auth = req.headers["authorization"] || "";
+    if (auth !== "Bearer " + config.secret) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Admin only" }));
+      return;
+    }
+
+    var targetUserId = req.url.replace("/admin/users/", "");
+    var users = loadUsers();
+    if (!users.users[targetUserId]) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "User not found" }));
+      return;
+    }
+
+    users.users[targetUserId].active = false;
+    saveUsers(users);
+
+    console.log("[ADMIN] Deactivated user: " + targetUserId);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, message: "User deactivated" }));
     return;
   }
 
@@ -339,6 +519,4 @@ server.listen(PORT, "0.0.0.0", function() {
   console.log("StepWise Publish API running on port " + PORT);
   console.log("Guides folder: " + GUIDES_DIR);
   console.log("Public URL: " + BASE_URL);
-  console.log("Index page: " + BASE_URL + "/");
-  rebuildIndex();
 });

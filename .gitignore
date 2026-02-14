@@ -1,5 +1,6 @@
 node_modules/
 publish-config.json
 deploy-config.json
+users.json
 *.bak
 .DS_Store
