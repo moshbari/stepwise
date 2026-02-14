@@ -63,6 +63,74 @@ async function ensureApiKey() {
   return false;
 }
 
+// Synchronous check — returns true only if key is already loaded in memory
+function hasApiKey() {
+  return PUBLISH_SECRET && PUBLISH_SECRET.length > 0;
+}
+
+// Lock or unlock brand settings and annotation toolbar based on API key state
+function updateLockedUI() {
+  var locked = !hasApiKey();
+
+  // Brand settings fields
+  var brandIds = ["brandName", "brandColor", "brandColorHex", "accentColor", "accentColorHex"];
+  brandIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.disabled = locked;
+      el.style.opacity = locked ? "0.4" : "1";
+      el.style.pointerEvents = locked ? "none" : "";
+    }
+  });
+
+  // Logo upload
+  var logoUpload = document.getElementById("logoUpload");
+  if (logoUpload) {
+    logoUpload.style.opacity = locked ? "0.4" : "1";
+    logoUpload.style.pointerEvents = locked ? "none" : "";
+  }
+
+  // Brand section lock overlay
+  var brandSection = document.getElementById("brandSection");
+  if (brandSection) {
+    var overlay = brandSection.querySelector(".lock-overlay");
+    if (locked && !overlay) {
+      overlay = document.createElement("div");
+      overlay.className = "lock-overlay";
+      overlay.innerHTML = '<div style="text-align:center;padding:8px 12px;cursor:pointer;">🔒 <span style="font-size:11px;color:#f59e0b;">Enter API key to customize</span></div>';
+      overlay.addEventListener("click", async function() {
+        if (await ensureApiKey()) { updateLockedUI(); }
+      });
+      brandSection.style.position = "relative";
+      brandSection.appendChild(overlay);
+    } else if (!locked && overlay) {
+      overlay.remove();
+    }
+  }
+
+  // Annotation toolbar lock overlays
+  document.querySelectorAll(".anno-toolbar").forEach(function(tb) {
+    var tbOverlay = tb.querySelector(".toolbar-lock-overlay");
+    if (locked) {
+      tb.classList.add("locked");
+      if (!tbOverlay) {
+        tbOverlay = document.createElement("div");
+        tbOverlay.className = "toolbar-lock-overlay";
+        tbOverlay.innerHTML = '🔒 <span>Enter API key to use editing tools</span>';
+        tbOverlay.addEventListener("click", async function(e) {
+          e.stopPropagation();
+          if (await ensureApiKey()) { updateLockedUI(); }
+        });
+        tb.style.position = "relative";
+        tb.appendChild(tbOverlay);
+      }
+    } else {
+      tb.classList.remove("locked");
+      if (tbOverlay) tbOverlay.remove();
+    }
+  });
+}
+
 // Fetch userId and index URL from server, store in chrome.storage
 function fetchAndStoreUserInfo() {
   fetch(PUBLISH_API_URL + "/me", {
@@ -217,6 +285,8 @@ document.addEventListener("DOMContentLoaded", function() {
           fetchAndStoreUserInfo();
         }
       }
+      // Lock/unlock branding & annotation tools based on key state
+      updateLockedUI();
     });
 
     // Check if already recording
@@ -407,6 +477,10 @@ function renderEditor() {
   editor.querySelectorAll(".anno-tool[data-tool]").forEach(function(btn) {
     btn.addEventListener("click", function(e) {
       e.stopPropagation();
+      if (!hasApiKey()) {
+        ensureApiKey().then(function(ok) { if (ok) updateLockedUI(); });
+        return;
+      }
       currentTool = btn.dataset.tool;
       if (currentTool !== "select") {
         Object.keys(annoState).forEach(function(sid) { annoState[sid].selectedIndex = -1; });
@@ -502,6 +576,7 @@ function renderEditor() {
   });
 
   setTimeout(initCanvases, 50);
+  setTimeout(updateLockedUI, 60);
 }
 
 function updateCursors() {
@@ -667,6 +742,10 @@ function moveShape(s, dx, dy) {
 
 function onDown(e, sid) {
   e.preventDefault(); e.stopPropagation();
+  if (!hasApiKey()) {
+    ensureApiKey().then(function(ok) { if (ok) updateLockedUI(); });
+    return;
+  }
   var as = getAS(sid);
   var pos = getPos(e, sid);
 
