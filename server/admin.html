@@ -78,9 +78,21 @@ tr:hover td { background: rgba(245,158,11,0.03); }
 /* Toast */
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 12px 24px; border-radius: 10px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
 
+/* Search & Filter */
+.search-bar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+.search-bar input { flex: 1; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 13px; outline: none; }
+.search-bar input:focus { border-color: #f59e0b; }
+.search-bar input::placeholder { color: #475569; }
+.filter-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.filter-btn { padding: 6px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #94a3b8; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.filter-btn:hover { border-color: #64748b; color: #e2e8f0; }
+.filter-btn.active { background: rgba(245,158,11,0.1); border-color: #f59e0b; color: #f59e0b; }
+.search-count { font-size: 11px; color: #64748b; margin-bottom: 12px; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .form-row { flex-direction: column; }
+  .search-bar { flex-direction: column; }
   table { font-size: 12px; }
   th, td { padding: 8px 6px; }
 }
@@ -134,6 +146,15 @@ tr:hover td { background: rgba(245,158,11,0.03); }
     <!-- User List -->
     <div class="section">
       <div class="section-title"><span>&#x1F465;</span> Customers</div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search by name, email, or ID...">
+        <div class="filter-btns">
+          <button class="filter-btn active" data-filter="all" onclick="setFilter(this)">All</button>
+          <button class="filter-btn" data-filter="active" onclick="setFilter(this)">Active</button>
+          <button class="filter-btn" data-filter="inactive" onclick="setFilter(this)">Inactive</button>
+        </div>
+      </div>
+      <div class="search-count" id="searchCount"></div>
       <div id="userList"></div>
     </div>
   </div>
@@ -144,6 +165,7 @@ tr:hover td { background: rgba(245,158,11,0.03); }
 <script>
 var API = "https://app.heychatmate.com/stepwise-api";
 var adminKey = "";
+var allUsers = [];
 
 function showToast(msg) {
   var t = document.getElementById("toast");
@@ -204,18 +226,66 @@ function doLogout() {
   }
 })();
 
+// === SEARCH ===
+document.getElementById("searchInput").addEventListener("input", filterUsers);
+
 // === RENDER USERS ===
 function renderUsers(users) {
+  // Sort newest first and store globally
+  users.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+  allUsers = users;
+
   var active = users.filter(function(u) { return u.active; }).length;
   document.getElementById("userCount").textContent = users.length + " customer" + (users.length === 1 ? "" : "s") + " (" + active + " active)";
 
-  if (users.length === 0) {
+  // Apply current search/filter
+  filterUsers();
+}
+
+function filterUsers() {
+  var query = document.getElementById("searchInput").value.toLowerCase().trim();
+  var activeBtn = document.querySelector(".filter-btn.active");
+  var statusFilter = activeBtn ? activeBtn.dataset.filter : "all";
+
+  var filtered = allUsers.filter(function(u) {
+    // Status filter
+    if (statusFilter === "active" && !u.active) return false;
+    if (statusFilter === "inactive" && u.active) return false;
+    // Search filter
+    if (query) {
+      var searchable = (u.name + " " + (u.email || "") + " " + u.userId + " " + (u.apiKey || "")).toLowerCase();
+      return searchable.indexOf(query) >= 0;
+    }
+    return true;
+  });
+
+  // Update search count
+  var countEl = document.getElementById("searchCount");
+  if (query || statusFilter !== "all") {
+    countEl.textContent = "Showing " + filtered.length + " of " + allUsers.length + " customers";
+  } else {
+    countEl.textContent = "";
+  }
+
+  renderFilteredUsers(filtered);
+}
+
+function setFilter(btn) {
+  document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("active"); });
+  btn.classList.add("active");
+  filterUsers();
+}
+
+function renderFilteredUsers(users) {
+  if (allUsers.length === 0) {
     document.getElementById("userList").innerHTML = '<div class="empty-state"><p>No customers yet. Add your first one above!</p></div>';
     return;
   }
 
-  // Sort newest first
-  users.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+  if (users.length === 0) {
+    document.getElementById("userList").innerHTML = '<div class="empty-state"><p>No customers match your search.</p></div>';
+    return;
+  }
 
   var html = '<table><thead><tr><th>Customer</th><th>Guides</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>';
 
