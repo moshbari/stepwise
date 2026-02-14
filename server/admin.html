@@ -121,13 +121,12 @@ tr:hover td { background: rgba(245,158,11,0.03); }
         <button class="btn btn-primary btn-sm" id="addBtn" onclick="addCustomer()">Create</button>
       </div>
       <div class="key-result" id="keyResult">
-        <div class="label">New customer created! Here's their API key:</div>
-        <div class="key-row">
-          <input type="text" id="newKeyDisplay" readonly>
-          <button class="btn btn-primary btn-sm" onclick="copyKey()">Copy</button>
-        </div>
-        <div class="info">
-          Give this key to the customer. Their guides page: <a id="newIndexLink" href="#" target="_blank"></a>
+        <div class="label">Customer created! Copy the message below and send it to them:</div>
+        <textarea id="onboardingMsg" readonly rows="9" style="width:100%;padding:12px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;line-height:1.5;resize:vertical;margin-bottom:8px;outline:none;"></textarea>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="copyOnboarding()">Copy Message</button>
+          <button class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;" onclick="copyKeyOnly()">Copy API Key Only</button>
+          <a id="newIndexLink" href="#" target="_blank" class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;text-decoration:none;">Open Guides Page</a>
         </div>
       </div>
     </div>
@@ -269,11 +268,23 @@ async function addCustomer() {
     var data = await res.json();
 
     if (data.success) {
-      // Show the key
-      document.getElementById("newKeyDisplay").value = data.apiKey;
+      // Build onboarding message
+      var msg = "Welcome to StepWise!\n\n" +
+        "Here's how to get started:\n\n" +
+        "1. Install the StepWise Chrome extension\n" +
+        "2. Record your steps, then click \"Publish \u2014 Get Link\"\n" +
+        "3. When asked for your API key, paste this:\n\n" +
+        data.apiKey + "\n\n" +
+        "That's it! You only need to enter the key once.\n\n" +
+        "Your published guides will appear at:\n" +
+        data.indexUrl;
+
+      document.getElementById("onboardingMsg").value = msg;
       document.getElementById("newIndexLink").href = data.indexUrl;
-      document.getElementById("newIndexLink").textContent = data.indexUrl;
       document.getElementById("keyResult").style.display = "block";
+
+      // Store key for copy-key-only button
+      document.getElementById("keyResult").dataset.apiKey = data.apiKey;
 
       // Clear form
       document.getElementById("newName").value = "";
@@ -294,9 +305,16 @@ async function addCustomer() {
   btn.textContent = "Create";
 }
 
-function copyKey() {
-  var input = document.getElementById("newKeyDisplay");
-  navigator.clipboard.writeText(input.value).then(function() {
+function copyOnboarding() {
+  var msg = document.getElementById("onboardingMsg").value;
+  navigator.clipboard.writeText(msg).then(function() {
+    showToast("Onboarding message copied!");
+  });
+}
+
+function copyKeyOnly() {
+  var key = document.getElementById("keyResult").dataset.apiKey;
+  navigator.clipboard.writeText(key).then(function() {
     showToast("API key copied!");
   });
 }
