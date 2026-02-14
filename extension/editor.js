@@ -147,13 +147,36 @@ function fetchAndStoreUserInfo() {
   .catch(function() {});
 }
 
-// Show/hide the "My Guides" link in the editor sidebar
+// Show/hide the "My Guides" and "Log Out" links in the editor sidebar
 function updateMyGuidesLink() {
   var link = document.getElementById("myGuidesLink");
-  if (link && USER_INDEX_URL) {
-    link.href = USER_INDEX_URL;
-    link.style.display = "block";
+  var logoutLink = document.getElementById("logoutLink");
+  var loggedIn = hasApiKey();
+  if (link) {
+    if (loggedIn && USER_INDEX_URL) {
+      link.href = USER_INDEX_URL;
+      link.style.display = "block";
+    } else {
+      link.style.display = "none";
+    }
   }
+  if (logoutLink) {
+    logoutLink.style.display = loggedIn ? "block" : "none";
+  }
+}
+
+// Log out: clear API key and re-lock everything
+function logoutAccount(e) {
+  if (e) e.preventDefault();
+  if (!confirm("Log out of StepWise?\nYou\u2019ll need to re-enter your API key to use publishing and editing features.")) return;
+  PUBLISH_SECRET = "";
+  USER_INDEX_URL = "";
+  if (typeof chrome !== "undefined" && chrome.storage) {
+    chrome.storage.local.remove(["publishSecret", "userIndexUrl", "userName"]);
+  }
+  updateMyGuidesLink();
+  updateLockedUI();
+  showToast("Logged out successfully");
 }
 
 // ============================================================
@@ -167,6 +190,7 @@ var lastKnownStepCount = 0;
 
 document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("addStepBtn").addEventListener("click", addManualStep);
+  document.getElementById("logoutLink").addEventListener("click", logoutAccount);
   document.getElementById("dropZone").addEventListener("click", function() { document.getElementById("jsonFileInput").click(); });
   document.getElementById("dropZone").addEventListener("dragover", function(e) { e.preventDefault(); e.currentTarget.classList.add("dragover"); });
   document.getElementById("dropZone").addEventListener("dragleave", function(e) { e.currentTarget.classList.remove("dragover"); });

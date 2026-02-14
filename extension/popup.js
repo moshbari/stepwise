@@ -39,8 +39,9 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("downloadJsonBtn").addEventListener("click", downloadJSON);
   document.getElementById("clearBtn").addEventListener("click", clearAll);
 
-  // My Guides link
+  // My Guides + Log Out links
   document.getElementById("myGuidesLink").addEventListener("click", openMyGuides);
+  document.getElementById("logoutLink").addEventListener("click", logoutAccount);
 
   // Settings
   document.getElementById("settingsLink").addEventListener("click", openSettings);
@@ -54,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("voiceToggleSettings").addEventListener("click", toggleVoice);
 
   loadSettings();
-  loadMyGuidesLink();
+  updateAccountLinks();
   refreshState();
 });
 
@@ -141,13 +142,22 @@ function updateVoiceToggles() {
   });
 }
 
-// --- My Guides Link ---
-function loadMyGuidesLink() {
+// --- Account Links (My Guides + Log Out) ---
+function updateAccountLinks() {
   chrome.storage.local.get(["publishSecret", "userIndexUrl"], function(result) {
-    if (result.publishSecret && result.userIndexUrl) {
-      var link = document.getElementById("myGuidesLink");
-      if (link) link.style.display = "inline";
-    }
+    var loggedIn = result.publishSecret && result.publishSecret.length > 0;
+    var hasUrl = loggedIn && result.userIndexUrl;
+    var guidesLink = document.getElementById("myGuidesLink");
+    var logoutLink = document.getElementById("logoutLink");
+    if (guidesLink) guidesLink.style.display = hasUrl ? "inline" : "none";
+    if (logoutLink) logoutLink.style.display = loggedIn ? "inline" : "none";
+  });
+}
+
+function logoutAccount() {
+  if (!confirm("Log out of StepWise?\nYou\u2019ll need to re-enter your API key to use publishing and editing features.")) return;
+  chrome.storage.local.remove(["publishSecret", "userIndexUrl", "userName"], function() {
+    updateAccountLinks();
   });
 }
 
