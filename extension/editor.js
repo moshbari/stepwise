@@ -2885,8 +2885,8 @@ async function startVideoGeneration() {
 
     document.getElementById("videoStatusText").textContent = "Sending data to server...";
 
-    // Built-in VPS URL
-    var vpsUrl = "http://109.205.182.135:3500";
+    // Video generation service (proxied through HTTPS)
+    var vpsUrl = "https://app.heychatmate.com/stepwise-video";
 
     fetch(vpsUrl + "/generate-video", {
       method: "POST",
