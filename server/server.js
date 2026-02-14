@@ -235,7 +235,7 @@ function readBody(req) {
 // CORS headers
 function setCORS(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
@@ -508,6 +508,33 @@ var server = http.createServer(async function(req, res) {
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, message: "User deactivated" }));
+    return;
+  }
+
+  // === ADMIN: Reactivate a user (admin only) ===
+  if (req.method === "PUT" && req.url.startsWith("/admin/users/")) {
+    var auth = req.headers["authorization"] || "";
+    if (auth !== "Bearer " + config.secret) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Admin only" }));
+      return;
+    }
+
+    var targetUserId = req.url.replace("/admin/users/", "");
+    var users = loadUsers();
+    if (!users.users[targetUserId]) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "User not found" }));
+      return;
+    }
+
+    users.users[targetUserId].active = true;
+    saveUsers(users);
+
+    console.log("[ADMIN] Reactivated user: " + targetUserId);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, message: "User reactivated" }));
     return;
   }
 

@@ -227,7 +227,7 @@ function renderUsers(users) {
     var indexUrl = "https://app.heychatmate.com/stepwise/" + u.userId + "/";
     var actionBtn = u.active
       ? '<button class="btn btn-danger btn-sm" onclick="deactivateUser(\'' + u.userId + '\')">Deactivate</button>'
-      : '<span style="color:#64748b;font-size:11px;">Deactivated</span>';
+      : '<button class="btn btn-sm" style="padding:6px 14px;font-size:12px;background:#1e293b;border:1px solid #22c55e;color:#22c55e;" onclick="reactivateUser(\'' + u.userId + '\')">Reactivate</button>';
 
     var keyRowId = "key-" + u.userId;
 
@@ -348,6 +348,28 @@ async function deactivateUser(userId) {
 
     if (data.success) {
       showToast("Customer deactivated");
+      refreshUsers();
+    } else {
+      showToast("Error: " + (data.error || "Failed"));
+    }
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+}
+
+// === REACTIVATE USER ===
+async function reactivateUser(userId) {
+  if (!confirm("Reactivate this customer? They will be able to publish and delete guides again.")) return;
+
+  try {
+    var res = await fetch(API + "/admin/users/" + userId, {
+      method: "PUT",
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      showToast("Customer reactivated");
       refreshUsers();
     } else {
       showToast("Error: " + (data.error || "Failed"));
