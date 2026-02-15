@@ -90,6 +90,16 @@ async function initDatabase() {
   await migrateFromJson();
 }
 
+// Convert ISO date string to MySQL DATETIME format
+function toMySQLDate(isoStr) {
+  try {
+    if (!isoStr) return new Date().toISOString().slice(0, 19).replace("T", " ");
+    return new Date(isoStr).toISOString().slice(0, 19).replace("T", " ");
+  } catch (e) {
+    return new Date().toISOString().slice(0, 19).replace("T", " ");
+  }
+}
+
 // === AUTO-MIGRATION FROM users.json ===
 async function migrateFromJson() {
   var usersFile = path.join(__dirname, "users.json");
@@ -111,7 +121,7 @@ async function migrateFromJson() {
     try {
       await pool.execute(
         "INSERT INTO users (id, api_key, name, email, plan, active, payment_source, payment_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [uid, u.apiKey, u.name || "", u.email || "", u.plan || "pro", u.active !== false ? 1 : 0, u.paymentSource || "manual", u.paymentId || "", u.createdAt || new Date().toISOString()]
+        [uid, u.apiKey, u.name || "", u.email || "", u.plan || "pro", u.active !== false ? 1 : 0, u.paymentSource || "manual", u.paymentId || "", toMySQLDate(u.createdAt)]
       );
       count++;
 
@@ -124,7 +134,7 @@ async function migrateFromJson() {
           for (var v of videos) {
             await pool.execute(
               "INSERT INTO videos (id, user_id, title, ghl_url, created_at) VALUES (?, ?, ?, ?, ?)",
-              [v.id, uid, v.title || "Untitled Video", v.ghlUrl, v.savedAt || new Date().toISOString()]
+              [v.id, uid, v.title || "Untitled Video", v.ghlUrl, toMySQLDate(v.savedAt)]
             );
           }
           console.log("[MIGRATE] " + uid + ": " + videos.length + " videos migrated");
@@ -150,7 +160,7 @@ async function migrateFromJson() {
 
           await pool.execute(
             "INSERT IGNORE INTO guides (user_id, slug, title, file_name, file_size, step_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [uid, slug, displayTitle, f, stats.size, stepCount, stats.mtime.toISOString()]
+            [uid, slug, displayTitle, f, stats.size, stepCount, toMySQLDate(stats.mtime.toISOString())]
           );
         }
         console.log("[MIGRATE] " + uid + ": " + files.length + " guides migrated");
