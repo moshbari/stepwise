@@ -184,13 +184,17 @@ function initEmail() {
     console.log("Email: DISABLED");
     return;
   }
-  emailTransporter = nodemailer.createTransport({
-    host: "localhost",
-    port: 25,
-    secure: false,
+  var smtpConfig = {
+    host: emailConfig.host || "localhost",
+    port: emailConfig.port || 587,
+    secure: emailConfig.port === 465,
     tls: { rejectUnauthorized: false }
-  });
-  console.log("Email: ENABLED via localhost SMTP");
+  };
+  if (emailConfig.user && emailConfig.pass) {
+    smtpConfig.auth = { user: emailConfig.user, pass: emailConfig.pass };
+  }
+  emailTransporter = nodemailer.createTransport(smtpConfig);
+  console.log("Email: ENABLED via " + smtpConfig.host + ":" + smtpConfig.port);
 }
 
 async function sendWelcomeEmail(email, name, apiKey, userId) {
