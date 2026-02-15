@@ -15,7 +15,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .header p { color: #94a3b8; font-size: 13px; }
 
 /* Container */
-.container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+.container { max-width: 960px; margin: 0 auto; padding: 30px 20px; }
 
 /* Login Screen */
 .login-box { max-width: 400px; margin: 80px auto; background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 40px; text-align: center; }
@@ -33,6 +33,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .btn-danger:hover { background: #ef4444; color: #fff; }
 .btn-sm { padding: 6px 14px; font-size: 12px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Stats Bar */
+.stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; text-align: center; }
+.stat-card .stat-value { font-size: 28px; font-weight: 700; color: #f59e0b; }
+.stat-card .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 4px; }
+.tab-btn { flex: 1; padding: 10px 16px; background: transparent; border: none; border-radius: 8px; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.tab-btn.active { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.tab-btn:hover:not(.active) { color: #e2e8f0; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
 
 /* Sections */
 .section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
@@ -63,6 +77,11 @@ tr:hover td { background: rgba(245,158,11,0.03); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
 .badge-active { background: rgba(34,197,94,0.15); color: #22c55e; }
 .badge-inactive { background: rgba(239,68,68,0.15); color: #ef4444; }
+.badge-source { background: rgba(99,102,241,0.15); color: #818cf8; }
+.badge-whop { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.badge-warriorplus { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.badge-jvzoo { background: rgba(168,85,247,0.15); color: #c084fc; }
+.badge-manual { background: rgba(100,116,139,0.15); color: #94a3b8; }
 .guide-count { font-weight: 600; color: #f59e0b; }
 .guide-link { color: #94a3b8; text-decoration: none; font-size: 12px; }
 .guide-link:hover { color: #f59e0b; }
@@ -89,10 +108,17 @@ tr:hover td { background: rgba(245,158,11,0.03); }
 .filter-btn.active { background: rgba(245,158,11,0.1); border-color: #f59e0b; color: #f59e0b; }
 .search-count { font-size: 11px; color: #64748b; margin-bottom: 12px; }
 
+/* Webhook Logs Table */
+.log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.log-table th { text-align: left; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid #334155; }
+.log-table td { padding: 10px; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 12px; }
+.log-table tr:hover td { background: rgba(245,158,11,0.03); }
+
 /* Responsive */
 @media (max-width: 600px) {
   .form-row { flex-direction: column; }
   .search-bar { flex-direction: column; }
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
   table { font-size: 12px; }
   th, td { padding: 8px 6px; }
 }
@@ -102,7 +128,7 @@ tr:hover td { background: rgba(245,158,11,0.03); }
 
 <div class="header">
   <h1><em>StepWise</em> Admin</h1>
-  <p>Manage your customers</p>
+  <p>Manage your SaaS platform</p>
 </div>
 
 <!-- Login Screen -->
@@ -124,38 +150,86 @@ tr:hover td { background: rgba(245,158,11,0.03); }
       <button class="logout-btn" onclick="doLogout()">Logout</button>
     </div>
 
-    <!-- Add Customer -->
-    <div class="section">
-      <div class="section-title"><span>&#x2795;</span> Add New Customer</div>
-      <div class="form-row">
-        <input type="text" id="newName" placeholder="Customer name (required)">
-        <input type="email" id="newEmail" placeholder="Email (optional)">
-        <button class="btn btn-primary btn-sm" id="addBtn" onclick="addCustomer()">Create</button>
-      </div>
-      <div class="key-result" id="keyResult">
-        <div class="label">Customer created! Copy the message below and send it to them:</div>
-        <textarea id="onboardingMsg" readonly rows="9" style="width:100%;padding:12px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;line-height:1.5;resize:vertical;margin-bottom:8px;outline:none;"></textarea>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary btn-sm" onclick="copyOnboarding()">Copy Message</button>
-          <button class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;" onclick="copyKeyOnly()">Copy API Key Only</button>
-          <a id="newIndexLink" href="#" target="_blank" class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;text-decoration:none;">Open Guides Page</a>
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total Users</div></div>
+      <div class="stat-card"><div class="stat-value" id="statActive">-</div><div class="stat-label">Active</div></div>
+      <div class="stat-card"><div class="stat-value" id="statGuides">-</div><div class="stat-label">Guides</div></div>
+      <div class="stat-card"><div class="stat-value" id="statVideos">-</div><div class="stat-label">Videos</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('customers', this)">Customers</button>
+      <button class="tab-btn" onclick="switchTab('webhooks', this)">Webhook Logs</button>
+      <button class="tab-btn" onclick="switchTab('test', this)">Test Webhook</button>
+    </div>
+
+    <!-- Tab: Customers -->
+    <div id="tab-customers" class="tab-content active">
+      <!-- Add Customer -->
+      <div class="section">
+        <div class="section-title"><span>&#x2795;</span> Add New Customer</div>
+        <div class="form-row">
+          <input type="text" id="newName" placeholder="Customer name (required)">
+          <input type="email" id="newEmail" placeholder="Email (optional)">
+          <button class="btn btn-primary btn-sm" id="addBtn" onclick="addCustomer()">Create</button>
         </div>
+        <div class="key-result" id="keyResult">
+          <div class="label">Customer created! Copy the message below and send it to them:</div>
+          <textarea id="onboardingMsg" readonly rows="9" style="width:100%;padding:12px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;line-height:1.5;resize:vertical;margin-bottom:8px;outline:none;"></textarea>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="copyOnboarding()">Copy Message</button>
+            <button class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;" onclick="copyKeyOnly()">Copy API Key Only</button>
+            <a id="newIndexLink" href="#" target="_blank" class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;text-decoration:none;">Open Guides Page</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- User List -->
+      <div class="section">
+        <div class="section-title"><span>&#x1F465;</span> Customers</div>
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="Search by name, email, ID, or source...">
+          <div class="filter-btns">
+            <button class="filter-btn active" data-filter="all" onclick="setFilter(this)">All</button>
+            <button class="filter-btn" data-filter="active" onclick="setFilter(this)">Active</button>
+            <button class="filter-btn" data-filter="inactive" onclick="setFilter(this)">Inactive</button>
+          </div>
+        </div>
+        <div class="search-count" id="searchCount"></div>
+        <div id="userList"></div>
       </div>
     </div>
 
-    <!-- User List -->
-    <div class="section">
-      <div class="section-title"><span>&#x1F465;</span> Customers</div>
-      <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="Search by name, email, or ID...">
-        <div class="filter-btns">
-          <button class="filter-btn active" data-filter="all" onclick="setFilter(this)">All</button>
-          <button class="filter-btn" data-filter="active" onclick="setFilter(this)">Active</button>
-          <button class="filter-btn" data-filter="inactive" onclick="setFilter(this)">Inactive</button>
+    <!-- Tab: Webhook Logs -->
+    <div id="tab-webhooks" class="tab-content">
+      <div class="section">
+        <div class="section-title"><span>&#x1F4CB;</span> Recent Webhook Events</div>
+        <div id="webhookLogs"><div class="empty-state"><p>Loading...</p></div></div>
+      </div>
+    </div>
+
+    <!-- Tab: Test Webhook -->
+    <div id="tab-test" class="tab-content">
+      <div class="section">
+        <div class="section-title"><span>&#x1F9EA;</span> Simulate Payment Webhook</div>
+        <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">Test the account creation flow as if a payment webhook was received. This creates a real account and sends a welcome email.</p>
+        <div class="form-row">
+          <input type="email" id="testEmail" placeholder="Customer email (required)">
+          <input type="text" id="testName" placeholder="Customer name (optional)">
+          <select id="testSource" style="padding:10px 14px;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;outline:none;">
+            <option value="whop">Whop</option>
+            <option value="warriorplus">WarriorPlus</option>
+            <option value="jvzoo">JVZoo</option>
+            <option value="test">Test</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="testBtn" onclick="testWebhook()">Simulate</button>
+        </div>
+        <div id="testResult" style="display:none;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px;margin-top:16px;">
+          <pre id="testResultText" style="font-size:12px;color:#e2e8f0;white-space:pre-wrap;font-family:monospace;"></pre>
         </div>
       </div>
-      <div class="search-count" id="searchCount"></div>
-      <div id="userList"></div>
     </div>
   </div>
 </div>
@@ -172,6 +246,16 @@ function showToast(msg) {
   t.textContent = msg;
   t.style.display = "block";
   setTimeout(function() { t.style.display = "none"; }, 3000);
+}
+
+// === TABS ===
+function switchTab(tabName, btn) {
+  document.querySelectorAll(".tab-content").forEach(function(el) { el.classList.remove("active"); });
+  document.querySelectorAll(".tab-btn").forEach(function(el) { el.classList.remove("active"); });
+  document.getElementById("tab-" + tabName).classList.add("active");
+  btn.classList.add("active");
+
+  if (tabName === "webhooks") loadWebhookLogs();
 }
 
 // === LOGIN ===
@@ -196,6 +280,7 @@ async function doLogin() {
       document.getElementById("loginScreen").style.display = "none";
       document.getElementById("dashboard").style.display = "block";
       renderUsers(data.users);
+      loadStats();
     } else {
       document.getElementById("loginError").style.display = "block";
     }
@@ -226,19 +311,33 @@ function doLogout() {
   }
 })();
 
+// === STATS ===
+async function loadStats() {
+  try {
+    var res = await fetch(API + "/admin/stats", {
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+    if (data.success) {
+      document.getElementById("statTotal").textContent = data.stats.totalUsers;
+      document.getElementById("statActive").textContent = data.stats.activeUsers;
+      document.getElementById("statGuides").textContent = data.stats.totalGuides;
+      document.getElementById("statVideos").textContent = data.stats.totalVideos;
+    }
+  } catch(e) {}
+}
+
 // === SEARCH ===
 document.getElementById("searchInput").addEventListener("input", filterUsers);
 
 // === RENDER USERS ===
 function renderUsers(users) {
-  // Sort newest first and store globally
   users.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
   allUsers = users;
 
   var active = users.filter(function(u) { return u.active; }).length;
   document.getElementById("userCount").textContent = users.length + " customer" + (users.length === 1 ? "" : "s") + " (" + active + " active)";
 
-  // Apply current search/filter
   filterUsers();
 }
 
@@ -248,18 +347,15 @@ function filterUsers() {
   var statusFilter = activeBtn ? activeBtn.dataset.filter : "all";
 
   var filtered = allUsers.filter(function(u) {
-    // Status filter
     if (statusFilter === "active" && !u.active) return false;
     if (statusFilter === "inactive" && u.active) return false;
-    // Search filter
     if (query) {
-      var searchable = (u.name + " " + (u.email || "") + " " + u.userId + " " + (u.apiKey || "")).toLowerCase();
+      var searchable = (u.name + " " + (u.email || "") + " " + u.userId + " " + (u.apiKey || "") + " " + (u.paymentSource || "")).toLowerCase();
       return searchable.indexOf(query) >= 0;
     }
     return true;
   });
 
-  // Update search count
   var countEl = document.getElementById("searchCount");
   if (query || statusFilter !== "all") {
     countEl.textContent = "Showing " + filtered.length + " of " + allUsers.length + " customers";
@@ -276,6 +372,14 @@ function setFilter(btn) {
   filterUsers();
 }
 
+function getSourceBadge(source) {
+  if (!source || source === "manual") return '<span class="badge badge-manual">Manual</span>';
+  if (source === "whop") return '<span class="badge badge-whop">Whop</span>';
+  if (source === "warriorplus") return '<span class="badge badge-warriorplus">W+</span>';
+  if (source === "jvzoo") return '<span class="badge badge-jvzoo">JVZoo</span>';
+  return '<span class="badge badge-source">' + escHtml(source) + '</span>';
+}
+
 function renderFilteredUsers(users) {
   if (allUsers.length === 0) {
     document.getElementById("userList").innerHTML = '<div class="empty-state"><p>No customers yet. Add your first one above!</p></div>';
@@ -287,7 +391,7 @@ function renderFilteredUsers(users) {
     return;
   }
 
-  var html = '<table><thead><tr><th>Customer</th><th>Guides</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>';
+  var html = '<table><thead><tr><th>Customer</th><th>Source</th><th>Guides</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>';
 
   users.forEach(function(u) {
     var date = new Date(u.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
@@ -304,7 +408,7 @@ function renderFilteredUsers(users) {
     html += '<tr>' +
       '<td>' +
         '<div class="user-name">' + escHtml(u.name) + '</div>' +
-        '<div class="user-email">' + escHtml(u.email || "—") + '</div>' +
+        '<div class="user-email">' + escHtml(u.email || "\u2014") + '</div>' +
         '<div class="user-id">' + u.userId + '</div>' +
         '<div id="' + keyRowId + '" style="display:none;margin-top:6px;">' +
           '<input type="text" value="' + escHtml(u.apiKey || "") + '" readonly style="width:100%;padding:6px 10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#f59e0b;font-size:11px;font-family:monospace;outline:none;" onclick="this.select()">' +
@@ -314,6 +418,7 @@ function renderFilteredUsers(users) {
           '</div>' +
         '</div>' +
       '</td>' +
+      '<td>' + getSourceBadge(u.paymentSource) + '</td>' +
       '<td><span class="guide-count">' + (u.guideCount || 0) + '</span> <a class="guide-link" href="' + indexUrl + '" target="_blank">View</a></td>' +
       '<td>' + badge + '</td>' +
       '<td class="date">' + date + '</td>' +
@@ -354,7 +459,6 @@ async function addCustomer() {
     var data = await res.json();
 
     if (data.success) {
-      // Build onboarding message
       var msg = "Welcome to StepWise!\n\n" +
         "Here's how to get started:\n\n" +
         "1. Install the StepWise Chrome extension\n" +
@@ -368,18 +472,14 @@ async function addCustomer() {
       document.getElementById("onboardingMsg").value = msg;
       document.getElementById("newIndexLink").href = data.indexUrl;
       document.getElementById("keyResult").style.display = "block";
-
-      // Store key for copy-key-only button
       document.getElementById("keyResult").dataset.apiKey = data.apiKey;
 
-      // Clear form
       document.getElementById("newName").value = "";
       document.getElementById("newEmail").value = "";
 
       showToast("Customer created!");
-
-      // Refresh user list
       refreshUsers();
+      loadStats();
     } else {
       showToast("Error: " + (data.error || "Failed"));
     }
@@ -419,6 +519,7 @@ async function deactivateUser(userId) {
     if (data.success) {
       showToast("Customer deactivated");
       refreshUsers();
+      loadStats();
     } else {
       showToast("Error: " + (data.error || "Failed"));
     }
@@ -441,6 +542,7 @@ async function reactivateUser(userId) {
     if (data.success) {
       showToast("Customer reactivated");
       refreshUsers();
+      loadStats();
     } else {
       showToast("Error: " + (data.error || "Failed"));
     }
@@ -500,9 +602,94 @@ function copyUserOnboarding(name, apiKey, userId) {
   });
 }
 
+// === WEBHOOK LOGS ===
+async function loadWebhookLogs() {
+  try {
+    var res = await fetch(API + "/admin/webhook-logs", {
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+
+    if (data.success && data.logs.length > 0) {
+      var html = '<table class="log-table"><thead><tr><th>Time</th><th>Source</th><th>Event</th><th>Email</th><th>Result</th></tr></thead><tbody>';
+      data.logs.forEach(function(log) {
+        var date = new Date(log.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+        html += '<tr>' +
+          '<td class="date">' + date + '</td>' +
+          '<td>' + getSourceBadge(log.source) + '</td>' +
+          '<td style="font-family:monospace;font-size:11px;">' + escHtml(log.event_type) + '</td>' +
+          '<td>' + escHtml(log.email || "\u2014") + '</td>' +
+          '<td style="font-size:11px;color:#94a3b8;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(log.result || "") + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById("webhookLogs").innerHTML = html;
+    } else {
+      document.getElementById("webhookLogs").innerHTML = '<div class="empty-state"><p>No webhook events yet. They will appear here when payment platforms send webhooks.</p></div>';
+    }
+  } catch(e) {
+    document.getElementById("webhookLogs").innerHTML = '<div class="empty-state"><p>Error loading logs: ' + escHtml(e.message) + '</p></div>';
+  }
+}
+
+// === TEST WEBHOOK ===
+async function testWebhook() {
+  var email = document.getElementById("testEmail").value.trim();
+  var name = document.getElementById("testName").value.trim();
+  var source = document.getElementById("testSource").value;
+
+  if (!email) {
+    showToast("Email is required for test webhook");
+    return;
+  }
+
+  var btn = document.getElementById("testBtn");
+  btn.disabled = true;
+  btn.textContent = "Simulating...";
+
+  try {
+    var res = await fetch(API + "/admin/test-webhook", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + adminKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email: email, name: name, source: source })
+    });
+    var data = await res.json();
+
+    var resultDiv = document.getElementById("testResult");
+    var resultText = document.getElementById("testResultText");
+    resultDiv.style.display = "block";
+
+    if (data.success) {
+      resultDiv.style.borderColor = "#22c55e";
+      resultText.textContent = "Account " + (data.isNew ? "CREATED" : "FOUND (already exists)") + "\n\n" +
+        "User ID:    " + data.userId + "\n" +
+        "API Key:    " + data.apiKey + "\n" +
+        "Guides URL: " + data.indexUrl + "\n" +
+        (data.isNew ? "\nWelcome email sent to " + email : "");
+      refreshUsers();
+      loadStats();
+    } else {
+      resultDiv.style.borderColor = "#ef4444";
+      resultText.textContent = "ERROR: " + (data.error || "Unknown error");
+    }
+  } catch(e) {
+    var resultDiv = document.getElementById("testResult");
+    var resultText = document.getElementById("testResultText");
+    resultDiv.style.display = "block";
+    resultDiv.style.borderColor = "#ef4444";
+    resultText.textContent = "ERROR: " + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Simulate";
+}
+
 // === UTILS ===
 function escHtml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 </script>
 

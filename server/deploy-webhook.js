@@ -57,6 +57,11 @@ function deploy() {
     // Copy server files to working directory
     console.log("[DEPLOY] Copying server files...");
     execSync("cp " + REPO_DIR + "/server/server.js /root/stepwise-publish/server.js", { encoding: "utf8" });
+    execSync("cp " + REPO_DIR + "/server/package.json /root/stepwise-publish/package.json", { encoding: "utf8" });
+
+    // Install/update dependencies
+    console.log("[DEPLOY] Installing dependencies...");
+    execSync("cd /root/stepwise-publish && npm install --production", { encoding: "utf8", timeout: 60000 });
 
     // Copy admin dashboard and privacy policy to public folder
     console.log("[DEPLOY] Copying admin dashboard and privacy policy...");
