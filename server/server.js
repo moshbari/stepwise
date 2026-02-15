@@ -31,6 +31,28 @@ if (fs.existsSync(CONFIG_FILE)) {
   console.log("========================================\n");
 }
 
+// === OPENAI PROXY CONFIG ===
+var OPENAI_API_KEY = config.openaiApiKey || "";
+if (OPENAI_API_KEY) {
+  console.log("OpenAI API proxy: ENABLED");
+} else {
+  console.log("OpenAI API proxy: DISABLED (no openaiApiKey in config)");
+}
+
+// === RATE LIMITING (in-memory) ===
+var rateLimits = {};
+function checkRateLimit(userId, endpoint, maxRequests) {
+  var now = Date.now();
+  var oneHour = 60 * 60 * 1000;
+  if (!rateLimits[userId]) rateLimits[userId] = {};
+  if (!rateLimits[userId][endpoint]) rateLimits[userId][endpoint] = [];
+  // Clean old entries
+  rateLimits[userId][endpoint] = rateLimits[userId][endpoint].filter(function(t) { return now - t < oneHour; });
+  if (rateLimits[userId][endpoint].length >= maxRequests) return false;
+  rateLimits[userId][endpoint].push(now);
+  return true;
+}
+
 // === USERS CONFIG ===
 const USERS_FILE = path.join(__dirname, "users.json");
 
@@ -291,6 +313,15 @@ function readBody(req) {
     var chunks = [];
     req.on("data", function(chunk) { chunks.push(chunk); });
     req.on("end", function() { resolve(Buffer.concat(chunks).toString()); });
+    req.on("error", reject);
+  });
+}
+
+function readRawBody(req) {
+  return new Promise(function(resolve, reject) {
+    var chunks = [];
+    req.on("data", function(chunk) { chunks.push(chunk); });
+    req.on("end", function() { resolve(Buffer.concat(chunks)); });
     req.on("error", reject);
   });
 }
@@ -714,6 +745,121 @@ var server = http.createServer(async function(req, res) {
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, message: "User reactivated" }));
+    return;
+  }
+
+  // === OPENAI PROXY: Whisper Transcription ===
+  if (req.method === "POST" && req.url === "/api/transcribe") {
+    if (!OPENAI_API_KEY) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "AI proxy not configured" }));
+      return;
+    }
+    var authResult = authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+    if (!checkRateLimit(authResult.userId, "transcribe", 20)) {
+      res.writeHead(429, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Rate limit exceeded. Max 20 transcriptions per hour." }));
+      return;
+    }
+    try {
+      var rawBody = await readRawBody(req);
+      var contentType = req.headers["content-type"] || "";
+      const https = require("https");
+      var openaiRes = await new Promise(function(resolve, reject) {
+        var openaiReq = https.request({
+          hostname: "api.openai.com",
+          path: "/v1/audio/transcriptions",
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + OPENAI_API_KEY,
+            "Content-Type": contentType,
+            "Content-Length": rawBody.length
+          }
+        }, function(r) {
+          var chunks = [];
+          r.on("data", function(c) { chunks.push(c); });
+          r.on("end", function() { resolve({ status: r.statusCode, body: Buffer.concat(chunks).toString() }); });
+        });
+        openaiReq.on("error", reject);
+        openaiReq.write(rawBody);
+        openaiReq.end();
+      });
+      res.writeHead(openaiRes.status, { "Content-Type": "application/json" });
+      res.end(openaiRes.body);
+    } catch (err) {
+      console.log("[PROXY] Transcribe error:", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Transcription proxy failed: " + err.message }));
+    }
+    return;
+  }
+
+  // === OPENAI PROXY: Text-to-Speech ===
+  if (req.method === "POST" && req.url === "/api/tts") {
+    if (!OPENAI_API_KEY) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "AI proxy not configured" }));
+      return;
+    }
+    var authResult = authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+    if (!checkRateLimit(authResult.userId, "tts", 30)) {
+      res.writeHead(429, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Rate limit exceeded. Max 30 TTS requests per hour." }));
+      return;
+    }
+    try {
+      var body = await readBody(req);
+      var data = JSON.parse(body);
+      var ttsPayload = JSON.stringify({
+        model: "tts-1",
+        input: (data.text || "").trim(),
+        voice: data.voice || "nova",
+        response_format: "mp3"
+      });
+      const https = require("https");
+      var openaiRes = await new Promise(function(resolve, reject) {
+        var openaiReq = https.request({
+          hostname: "api.openai.com",
+          path: "/v1/audio/speech",
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + OPENAI_API_KEY,
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(ttsPayload)
+          }
+        }, function(r) {
+          var chunks = [];
+          r.on("data", function(c) { chunks.push(c); });
+          r.on("end", function() {
+            var buf = Buffer.concat(chunks);
+            if (r.statusCode === 200) {
+              resolve({ status: 200, body: JSON.stringify({ success: true, audioBase64: buf.toString("base64") }) });
+            } else {
+              resolve({ status: r.statusCode, body: buf.toString() });
+            }
+          });
+        });
+        openaiReq.on("error", reject);
+        openaiReq.write(ttsPayload);
+        openaiReq.end();
+      });
+      res.writeHead(openaiRes.status, { "Content-Type": "application/json" });
+      res.end(openaiRes.body);
+    } catch (err) {
+      console.log("[PROXY] TTS error:", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "TTS proxy failed: " + err.message }));
+    }
     return;
   }
 

@@ -9,6 +9,8 @@ var stepCounter = 0;
 var lastCaptureTime = 0;
 var voiceEnabled = false;
 var cachedApiKey = "";
+var cachedPublishSecret = "";
+var PROXY_API_URL = "https://app.heychatmate.com/stepwise-api";
 
 // --- Encryption (must match popup.js) ---
 var ENCRYPT_KEY = "StepWise_2024_SecureKey";
@@ -25,8 +27,9 @@ function decryptKey(encoded) {
 }
 
 function loadApiKey() {
-  chrome.storage.local.get(["encryptedApiKey"], function(result) {
+  chrome.storage.local.get(["encryptedApiKey", "publishSecret"], function(result) {
     cachedApiKey = decryptKey(result.encryptedApiKey || "");
+    cachedPublishSecret = result.publishSecret || "";
   });
 }
 loadApiKey();
@@ -34,6 +37,13 @@ loadApiKey();
 // Load voice state
 chrome.storage.local.get(["voiceEnabled"], function(result) {
   voiceEnabled = result.voiceEnabled || false;
+});
+
+// Reload keys when storage changes (login/logout from editor or popup)
+chrome.storage.onChanged.addListener(function(changes) {
+  if (changes.publishSecret || changes.encryptedApiKey) {
+    loadApiKey();
+  }
 });
 
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
@@ -109,16 +119,15 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 
 async function whisperTranscribe(audioBase64, stepId, sendResponse) {
   console.log("StepWise Whisper: Called with stepId:", stepId, "audioBase64 length:", audioBase64 ? audioBase64.length : 0);
-  
-  if (!cachedApiKey) {
+
+  if (!cachedApiKey && !cachedPublishSecret) {
     loadApiKey();
-    // Wait a moment for key to load
     await new Promise(function(r) { setTimeout(r, 200); });
   }
 
-  if (!cachedApiKey) {
+  if (!cachedApiKey && !cachedPublishSecret) {
     console.log("StepWise Whisper: ❌ No API key");
-    sendResponse({ success: false, error: "No API key. Go to StepWise Settings to add your OpenAI key." });
+    sendResponse({ success: false, error: "No API key. Go to StepWise Settings to add your OpenAI key, or enter your StepWise API key." });
     return;
   }
 
@@ -137,12 +146,49 @@ async function whisperTranscribe(audioBase64, stepId, sendResponse) {
     formData.append("model", "whisper-1");
     formData.append("language", "en");
 
-    console.log("StepWise Whisper: Calling OpenAI Whisper API...");
-    var response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + cachedApiKey },
-      body: formData
-    });
+    var response;
+    var usedProxy = false;
+
+    // Try server proxy first if user has publishSecret
+    if (cachedPublishSecret) {
+      try {
+        console.log("StepWise Whisper: Trying server proxy...");
+        response = await fetch(PROXY_API_URL + "/api/transcribe", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + cachedPublishSecret },
+          body: formData
+        });
+        if (response.ok) {
+          usedProxy = true;
+          console.log("StepWise Whisper: ✅ Server proxy succeeded");
+        } else {
+          console.log("StepWise Whisper: Server proxy returned", response.status, "- falling back to direct");
+          response = null;
+        }
+      } catch (proxyErr) {
+        console.log("StepWise Whisper: Server proxy failed:", proxyErr.message, "- falling back to direct");
+        response = null;
+      }
+    }
+
+    // Fall back to direct OpenAI call with user's own key
+    if (!response && cachedApiKey) {
+      console.log("StepWise Whisper: Calling OpenAI directly...");
+      var formData2 = new FormData();
+      formData2.append("file", blob, "recording.webm");
+      formData2.append("model", "whisper-1");
+      formData2.append("language", "en");
+      response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + cachedApiKey },
+        body: formData2
+      });
+    }
+
+    if (!response) {
+      sendResponse({ success: false, error: "No available API access. Enter your StepWise API key or OpenAI key." });
+      return;
+    }
 
     if (!response.ok) {
       var errText = await response.text();
@@ -177,13 +223,13 @@ async function whisperTranscribe(audioBase64, stepId, sendResponse) {
 // --- Text-to-Speech (OpenAI TTS) ---
 
 async function ttsSpeak(text, voice, sendResponse) {
-  if (!cachedApiKey) {
+  if (!cachedApiKey && !cachedPublishSecret) {
     loadApiKey();
     await new Promise(function(r) { setTimeout(r, 200); });
   }
 
-  if (!cachedApiKey) {
-    sendResponse({ success: false, error: "No API key. Go to StepWise Settings to add your OpenAI key." });
+  if (!cachedApiKey && !cachedPublishSecret) {
+    sendResponse({ success: false, error: "No API key. Go to StepWise Settings to add your OpenAI key, or enter your StepWise API key." });
     return;
   }
 
@@ -193,36 +239,73 @@ async function ttsSpeak(text, voice, sendResponse) {
   }
 
   try {
-    var response = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + cachedApiKey,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "tts-1",
-        input: text.trim(),
-        voice: voice || "nova",
-        response_format: "mp3"
-      })
-    });
+    var audioDataUrl = null;
 
-    if (!response.ok) {
-      var errText = await response.text();
-      sendResponse({ success: false, error: "TTS API error: " + response.status + " " + errText });
+    // Try server proxy first if user has publishSecret
+    if (cachedPublishSecret) {
+      try {
+        console.log("StepWise TTS: Trying server proxy...");
+        var proxyRes = await fetch(PROXY_API_URL + "/api/tts", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + cachedPublishSecret,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: text.trim(), voice: voice || "nova" })
+        });
+        if (proxyRes.ok) {
+          var proxyData = await proxyRes.json();
+          if (proxyData.success && proxyData.audioBase64) {
+            audioDataUrl = "data:audio/mp3;base64," + proxyData.audioBase64;
+            console.log("StepWise TTS: ✅ Server proxy succeeded");
+          }
+        } else {
+          console.log("StepWise TTS: Server proxy returned", proxyRes.status, "- falling back to direct");
+        }
+      } catch (proxyErr) {
+        console.log("StepWise TTS: Server proxy failed:", proxyErr.message, "- falling back to direct");
+      }
+    }
+
+    // Fall back to direct OpenAI call with user's own key
+    if (!audioDataUrl && cachedApiKey) {
+      console.log("StepWise TTS: Calling OpenAI directly...");
+      var response = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + cachedApiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "tts-1",
+          input: text.trim(),
+          voice: voice || "nova",
+          response_format: "mp3"
+        })
+      });
+
+      if (!response.ok) {
+        var errText = await response.text();
+        sendResponse({ success: false, error: "TTS API error: " + response.status + " " + errText });
+        return;
+      }
+
+      var arrayBuffer = await response.arrayBuffer();
+      var bytes = new Uint8Array(arrayBuffer);
+      var binary = "";
+      var chunkSize = 8192;
+      for (var i = 0; i < bytes.length; i += chunkSize) {
+        var chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, chunk);
+      }
+      var base64 = btoa(binary);
+      audioDataUrl = "data:audio/mp3;base64," + base64;
+    }
+
+    if (!audioDataUrl) {
+      sendResponse({ success: false, error: "No available API access. Enter your StepWise API key or OpenAI key." });
       return;
     }
-
-    var arrayBuffer = await response.arrayBuffer();
-    var bytes = new Uint8Array(arrayBuffer);
-    var binary = "";
-    var chunkSize = 8192;
-    for (var i = 0; i < bytes.length; i += chunkSize) {
-      var chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, chunk);
-    }
-    var base64 = btoa(binary);
-    var audioDataUrl = "data:audio/mp3;base64," + base64;
 
     sendResponse({ success: true, audioDataUrl: audioDataUrl });
   } catch (err) {

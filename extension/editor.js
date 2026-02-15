@@ -39,6 +39,7 @@ var ttsAudioCache = {}; // cache generated audio per step to avoid re-calling AP
 var PUBLISH_API_URL = "https://app.heychatmate.com/stepwise-api";
 var PUBLISH_SECRET = ""; // Will be loaded from chrome.storage settings
 var USER_INDEX_URL = ""; // Will be loaded after API key validation
+var UPGRADE_URL = "https://whop.com/checkout/eJi0YLEJVjuhuE1ah-ZUHg-f4Bs-S7vJ-X5obfstkNtxZ/";
 
 // Ensure user has entered their StepWise API key before using any feature
 async function ensureApiKey() {
@@ -97,12 +98,13 @@ function updateLockedUI() {
     if (locked && !overlay) {
       overlay = document.createElement("div");
       overlay.className = "lock-overlay";
-      overlay.innerHTML = '<div style="text-align:center;padding:8px 12px;cursor:pointer;">🔒 <span style="font-size:11px;color:#f59e0b;">Enter API key to customize</span></div>';
+      overlay.innerHTML = '<div style="text-align:center;padding:8px 12px;cursor:pointer;">🔒 <span style="font-size:11px;color:#f59e0b;">Enter API key to customize</span><br><a href="#" class="upgrade-overlay-link" style="font-size:10px;color:#f59e0b;opacity:0.8;text-decoration:underline;margin-top:4px;display:inline-block;">or Upgrade to Pro</a></div>';
       overlay.addEventListener("click", async function() {
         if (await ensureApiKey()) { updateLockedUI(); }
       });
       brandSection.style.position = "relative";
       brandSection.appendChild(overlay);
+      overlay.querySelector(".upgrade-overlay-link").addEventListener("click", function(e) { e.preventDefault(); e.stopPropagation(); window.open(UPGRADE_URL, "_blank"); });
     } else if (!locked && overlay) {
       overlay.remove();
     }
@@ -116,13 +118,14 @@ function updateLockedUI() {
       if (!tbOverlay) {
         tbOverlay = document.createElement("div");
         tbOverlay.className = "toolbar-lock-overlay";
-        tbOverlay.innerHTML = '🔒 <span>Enter API key to use editing tools</span>';
+        tbOverlay.innerHTML = '🔒 <span>Enter API key to use editing tools</span> <a href="#" class="upgrade-overlay-link" style="font-size:10px;color:#fbbf24;text-decoration:underline;margin-left:6px;">or Upgrade to Pro</a>';
         tbOverlay.addEventListener("click", async function(e) {
           e.stopPropagation();
           if (await ensureApiKey()) { updateLockedUI(); }
         });
         tb.style.position = "relative";
         tb.appendChild(tbOverlay);
+        tbOverlay.querySelector(".upgrade-overlay-link").addEventListener("click", function(e) { e.preventDefault(); e.stopPropagation(); window.open(UPGRADE_URL, "_blank"); });
       }
     } else {
       tb.classList.remove("locked");
@@ -215,6 +218,7 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("ttsPlayAllBtn").addEventListener("click", ttsPlayAll);
   document.getElementById("generateVideoBtn").addEventListener("click", startVideoGeneration);
   document.getElementById("videoCancelBtn").addEventListener("click", cancelVideoGeneration);
+  document.getElementById("upgradePanelBtn").addEventListener("click", function() { window.open(UPGRADE_URL, "_blank"); });
   document.getElementById("ttsVoiceSelect").addEventListener("change", function() {
     // Clear cache when voice changes so new voice is used
     ttsAudioCache = {};

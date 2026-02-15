@@ -43,6 +43,8 @@
     .footer { padding: 10px 18px 14px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: center; gap: 16px; }
     .footer span { font-size: 11px; color: #64748b; cursor: pointer; }
     .footer span:hover { color: #94a3b8; }
+    .footer .upgrade-link { color: #f59e0b; font-weight: 600; }
+    .footer .upgrade-link:hover { color: #fbbf24; }
     .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 10px 0; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     .steps-preview::-webkit-scrollbar { width: 4px; }
@@ -161,6 +163,7 @@
         </button>
       </div>
       <div class="key-status empty" id="keyStatus">⚠ No API key saved</div>
+      <div id="proNote" style="display:none;font-size:10px;color:#f59e0b;margin-top:6px;padding:6px 8px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:6px;">⭐ Pro users: This is optional. Your subscription includes AI features.</div>
       <div class="security-note">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         Your key is encrypted and stored locally on your device only. It is never sent anywhere except directly to OpenAI's API. StepWise cannot see your key.
@@ -187,6 +190,7 @@
     <span id="myGuidesLink" style="display:none;color:#f59e0b;">My Guides</span>
     <span id="logoutLink" style="display:none;color:#ef4444;">Log Out</span>
     <span id="settingsLink">Settings</span>
+    <span class="upgrade-link" id="upgradeLink">Upgrade to Pro</span>
     <span>v1.1.0</span>
   </div>
   <script src="popup.js"></script>

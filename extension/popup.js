@@ -4,6 +4,7 @@
 
 var currentState = { isRecording: false, steps: [] };
 var voiceEnabled = false;
+var UPGRADE_URL = "https://whop.com/checkout/eJi0YLEJVjuhuE1ah-ZUHg-f4Bs-S7vJ-X5obfstkNtxZ/";
 
 // --- Simple encryption for API key ---
 var ENCRYPT_KEY = "StepWise_2024_SecureKey";
@@ -42,6 +43,11 @@ document.addEventListener("DOMContentLoaded", function() {
   // My Guides + Log Out links
   document.getElementById("myGuidesLink").addEventListener("click", openMyGuides);
   document.getElementById("logoutLink").addEventListener("click", logoutAccount);
+
+  // Upgrade to Pro
+  document.getElementById("upgradeLink").addEventListener("click", function() {
+    chrome.tabs.create({ url: UPGRADE_URL });
+  });
 
   // Settings
   document.getElementById("settingsLink").addEventListener("click", openSettings);
@@ -149,8 +155,10 @@ function updateAccountLinks() {
     var hasUrl = loggedIn && result.userIndexUrl;
     var guidesLink = document.getElementById("myGuidesLink");
     var logoutLink = document.getElementById("logoutLink");
+    var proNote = document.getElementById("proNote");
     if (guidesLink) guidesLink.style.display = hasUrl ? "inline" : "none";
     if (logoutLink) logoutLink.style.display = loggedIn ? "inline" : "none";
+    if (proNote) proNote.style.display = loggedIn ? "block" : "none";
   });
 }
 
