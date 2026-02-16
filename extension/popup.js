@@ -4,7 +4,7 @@
 
 var currentState = { isRecording: false, steps: [] };
 var voiceEnabled = false;
-var UPGRADE_URL = "https://whop.com/checkout/eJi0YLEJVjuhuE1ah-ZUHg-f4Bs-S7vJ-X5obfstkNtxZ/";
+var UPGRADE_URL = "https://stepwise.heychatmate.com/stepwise";
 
 // --- Simple encryption for API key ---
 var ENCRYPT_KEY = "StepWise_2024_SecureKey";

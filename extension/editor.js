@@ -39,7 +39,7 @@ var ttsAudioCache = {}; // cache generated audio per step to avoid re-calling AP
 var PUBLISH_API_URL = "https://app.heychatmate.com/stepwise-api";
 var PUBLISH_SECRET = ""; // Will be loaded from chrome.storage settings
 var USER_INDEX_URL = ""; // Will be loaded after API key validation
-var UPGRADE_URL = "https://whop.com/checkout/eJi0YLEJVjuhuE1ah-ZUHg-f4Bs-S7vJ-X5obfstkNtxZ/";
+var UPGRADE_URL = "https://stepwise.heychatmate.com/stepwise";
 
 // Ensure user has entered their StepWise API key before using any feature
 async function ensureApiKey() {
