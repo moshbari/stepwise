@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StepWise — Extension Downloads</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 40px 20px; }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { color: #f59e0b; font-size: 28px; margin-bottom: 8px; }
+  .subtitle { color: #64748b; margin-bottom: 40px; font-size: 14px; }
+  .version-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .version-card.latest { border-color: #f59e0b; }
+  .version-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .version-name { font-size: 20px; font-weight: 700; color: #f1f5f9; }
+  .version-date { color: #64748b; font-size: 13px; }
+  .badge { display: inline-block; background: #f59e0b; color: #0f172a; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+  .changes { margin-bottom: 16px; }
+  .changes h4 { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .changes ul { list-style: none; padding: 0; }
+  .changes li { color: #cbd5e1; font-size: 14px; padding: 4px 0; padding-left: 20px; position: relative; line-height: 1.5; }
+  .changes li::before { content: ""; position: absolute; left: 0; top: 11px; width: 8px; height: 8px; border-radius: 50%; }
+  .changes.new li::before { background: #22c55e; }
+  .changes.changed li::before { background: #3b82f6; }
+  .changes.fixed li::before { background: #f59e0b; }
+  .download-btn { display: inline-flex; align-items: center; gap: 8px; background: #f59e0b; color: #0f172a; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 8px; transition: background 0.2s; }
+  .download-btn:hover { background: #d97706; }
+  .download-btn svg { width: 16px; height: 16px; }
+  .file-size { color: #64748b; font-size: 12px; margin-left: 8px; }
+  .install-note { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 30px; }
+  .install-note h3 { color: #f59e0b; font-size: 16px; margin-bottom: 12px; }
+  .install-note ol { padding-left: 20px; color: #94a3b8; font-size: 14px; line-height: 1.8; }
+  .install-note code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #f59e0b; }
+  footer { text-align: center; color: #475569; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #1e293b; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>StepWise Extension Downloads</h1>
+  <p class="subtitle">All versions of the StepWise Chrome extension. Download, unzip, and load in Chrome.</p>
+
+  <div class="install-note">
+    <h3>How to Install</h3>
+    <ol>
+      <li>Download the zip file below</li>
+      <li>Unzip it to a folder on your computer</li>
+      <li>Open Chrome and go to <code>chrome://extensions</code></li>
+      <li>Enable <strong>Developer mode</strong> (top right toggle)</li>
+      <li>Click <strong>Load unpacked</strong> and select the unzipped folder</li>
+    </ol>
+  </div>
+
+  <!-- VERSIONS — newest first -->
+
+  <div class="version-card latest">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.2.0</span>
+        <span class="badge">LATEST</span>
+      </div>
+      <span class="version-date">Feb 16, 2026</span>
+    </div>
+    <div class="changes changed">
+      <h4>Changed</h4>
+      <ul>
+        <li>Upgrade to Pro link now points to WarriorPlus sales page</li>
+      </ul>
+    </div>
+    <div class="changes fixed">
+      <h4>Fixed</h4>
+      <ul>
+        <li>WarriorPlus webhook now works with new multipart WP_ format</li>
+        <li>Welcome emails sent via GoHighLevel instead of Brevo SMTP</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.2.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.2.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.1.0</span>
+      </div>
+      <span class="version-date">Feb 15, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Upgrade to Pro link and checkout integration</li>
+        <li>OpenAI API proxy for Pro users (no need for personal OpenAI key)</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.1.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.1.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.0.0</span>
+      </div>
+      <span class="version-date">Feb 14, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Initial release prepared for Chrome Web Store</li>
+        <li>Click recording with automatic screenshot capture</li>
+        <li>Full annotation editor (circles, arrows, blur, callouts)</li>
+        <li>Brand customization (company name, logo, colors)</li>
+        <li>Export as PDF, HTML, or publish online</li>
+        <li>Voice narration with speech-to-text</li>
+        <li>API key gating for Pro features</li>
+        <li>My Guides link and account management</li>
+        <li>Log out option in popup and editor</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.0.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.0.0
+    </a>
+  </div>
+
+  <footer>&copy; 2026 StepWise. All rights reserved.</footer>
+</div>
+</body>
+</html>
