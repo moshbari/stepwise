@@ -26,6 +26,8 @@ stepwise/
 ├── server/             ← VPS server code (auto-deploys on push)
 │   ├── server.js           ← Publish API (port 3600)
 │   ├── deploy-webhook.js   ← Auto-deploy webhook (port 3601)
+│   ├── downloads.html      ← Extension downloads page (hosted at /stepwise/downloads/)
+│   ├── deploy-downloads.sh ← Script to zip extension and upload to server
 │   └── setup.sh            ← First-time server setup script
 ├── .gitignore
 └── CLAUDE-INSTRUCTIONS.md  ← This file
@@ -251,6 +253,64 @@ There's also a video generation feature that uploads to GHL. Reference:
 - Files must include `parentId` during upload to land in folders
 - Folder IDs use `_id` field, not `id`
 - Full reference in GHL-Media-API-Reference.docx
+
+## Extension Downloads Page
+
+All extension versions are hosted as zip files at:
+- **URL:** https://app.heychatmate.com/stepwise/downloads/
+- **Server path:** /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/downloads/
+- **Page source:** `server/downloads.html` (deployed as `index.html`)
+- **Deploy script:** `server/deploy-downloads.sh`
+
+### Releasing a New Version
+When extension code changes:
+1. Update `server/downloads.html` — add a new version card at the top (move "latest" badge)
+2. Run: `bash server/deploy-downloads.sh v1.X.0` (zips extension and uploads)
+3. Commit and push `server/downloads.html`
+
+### Current Versions
+- **v1.2.0** (Feb 16, 2026) — WarriorPlus upgrade link, GHL email, WP webhook fix
+- **v1.1.0** (Feb 15, 2026) — Upgrade to Pro link, OpenAI API proxy
+- **v1.0.0** (Feb 14, 2026) — Initial release
+
+## Payment & Email Integration
+
+### Payment Platform: WarriorPlus
+- **Product ID:** wso_wp73d1
+- **IPN URL:** https://app.heychatmate.com/stepwise-api/webhooks/warriorplus
+- **Upgrade URL in extension:** https://stepwise.heychatmate.com/stepwise (set in `UPGRADE_URL` variable in both `popup.js` and `editor.js`)
+
+### Transactional Email: GoHighLevel (GHL)
+Welcome emails are sent via GHL workflow (not SMTP). The flow:
+1. Customer buys on WarriorPlus → IPN hits `/webhooks/warriorplus`
+2. Server creates account + API key
+3. Server POSTs to GHL Inbound Webhook URL (configured in `publish-config.json` under `ghl.webhookUrl`)
+4. GHL workflow creates contact and sends welcome email with API key
+
+**GHL Webhook URL** is stored in `publish-config.json`:
+```json
+"ghl": {
+  "webhookUrl": "https://services.leadconnectorhq.com/hooks/..."
+}
+```
+
+**GHL Workflow:** "StepWise Welcome Email 16Feb26" — Inbound Webhook → Create Contact → Send Email
+
+**Email merge fields from webhook:**
+- `{{inboundWebhookRequest.email}}` — customer email
+- `{{inboundWebhookRequest.name}}` — customer name
+- `{{inboundWebhookRequest.apiKey}}` — their API key
+- `{{inboundWebhookRequest.guidesUrl}}` — their guides page URL
+- `{{inboundWebhookRequest.userId}}` — their user ID
+
+**Fallback:** If `ghl.webhookUrl` is not set in config, falls back to Nodemailer SMTP (currently Brevo, but authentication is broken).
+
+### Webhook Endpoints
+| Platform | Endpoint | Format |
+|---|---|---|
+| Whop | POST /webhooks/whop | JSON |
+| WarriorPlus | POST /webhooks/warriorplus | Multipart form-data (WP_ fields) or URL-encoded (WSO_ fields) |
+| JVZoo | POST /webhooks/jvzoo | URL-encoded |
 
 ## Common Tasks
 
