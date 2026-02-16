@@ -44,6 +44,7 @@ if (OPENAI_API_KEY) {
 // === WEBHOOK CONFIG ===
 var webhookConfig = config.webhooks || {};
 var emailConfig = config.email || {};
+var ghlConfig = config.ghl || {};
 
 // === RATE LIMITING (in-memory) ===
 var rateLimits = {};
@@ -180,6 +181,10 @@ async function migrateFromJson() {
 // === EMAIL SETUP ===
 var emailTransporter = null;
 function initEmail() {
+  if (ghlConfig.webhookUrl) {
+    console.log("Email: GHL webhook mode (" + ghlConfig.webhookUrl.substring(0, 50) + "...)");
+    return;
+  }
   if (!emailConfig.enabled) {
     console.log("Email: DISABLED");
     return;
@@ -232,6 +237,52 @@ async function sendWelcomeEmail(email, name, apiKey, userId) {
     console.log("[EMAIL] Welcome email sent to " + email);
   } catch (err) {
     console.error("[EMAIL] Failed to send to " + email + ":", err.message);
+  }
+}
+
+// === GHL WEBHOOK TRIGGER ===
+async function triggerGHLWebhook(email, name, apiKey, userId) {
+  if (!ghlConfig.webhookUrl) return;
+  var indexUrl = BASE_URL + "/" + userId + "/";
+  var payload = JSON.stringify({
+    email: email,
+    name: name || "",
+    apiKey: apiKey,
+    guidesUrl: indexUrl,
+    userId: userId
+  });
+
+  try {
+    await new Promise(function(resolve, reject) {
+      var urlObj = new URL(ghlConfig.webhookUrl);
+      var options = {
+        hostname: urlObj.hostname,
+        port: urlObj.port || 443,
+        path: urlObj.pathname + urlObj.search,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload)
+        }
+      };
+      var req = https.request(options, function(res) {
+        var body = "";
+        res.on("data", function(chunk) { body += chunk; });
+        res.on("end", function() {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(body);
+          } else {
+            reject(new Error("GHL responded with " + res.statusCode + ": " + body));
+          }
+        });
+      });
+      req.on("error", reject);
+      req.write(payload);
+      req.end();
+    });
+    console.log("[GHL] Webhook triggered for " + email);
+  } catch (err) {
+    console.error("[GHL] Failed to trigger webhook for " + email + ":", err.message);
   }
 }
 
@@ -355,8 +406,12 @@ async function createAccountFromWebhook(source, email, name, transactionId) {
 
   console.log("[WEBHOOK] " + source + ": Created new user " + userId + " (" + email + ")");
 
-  // Send welcome email
-  await sendWelcomeEmail(email, name || email.split("@")[0], apiKey, userId);
+  // Send welcome email (GHL webhook preferred, SMTP fallback)
+  if (ghlConfig.webhookUrl) {
+    await triggerGHLWebhook(email, name || email.split("@")[0], apiKey, userId);
+  } else {
+    await sendWelcomeEmail(email, name || email.split("@")[0], apiKey, userId);
+  }
 
   return { userId: userId, apiKey: apiKey, isNew: true };
 }
