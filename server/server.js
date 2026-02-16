@@ -649,6 +649,22 @@ function parseFormBody(bodyStr) {
   return params;
 }
 
+// Parse multipart form-data (used by WarriorPlus new format)
+function parseMultipartBody(bodyStr) {
+  var params = {};
+  var parts = bodyStr.split(/--[\w-]+/);
+  parts.forEach(function(part) {
+    var nameMatch = part.match(/name="([^"]+)"/);
+    if (nameMatch) {
+      var value = part.split("\r\n\r\n");
+      if (value.length > 1) {
+        params[nameMatch[1]] = value[1].replace(/\r\n--$/, "").replace(/\r\n$/, "").trim();
+      }
+    }
+  });
+  return params;
+}
+
 // CORS headers
 function setCORS(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -1069,7 +1085,8 @@ var server = http.createServer(async function(req, res) {
   if (req.method === "POST" && req.url === "/webhooks/warriorplus") {
     try {
       var bodyStr = await readBody(req);
-      var params = parseFormBody(bodyStr);
+      // Support both URL-encoded (old) and multipart form-data (new WP format)
+      var params = bodyStr.trimStart().startsWith("--") ? parseMultipartBody(bodyStr) : parseFormBody(bodyStr);
 
       // Verify signature if configured
       if (webhookConfig.warriorplus && webhookConfig.warriorplus.secret) {
@@ -1082,10 +1099,11 @@ var server = http.createServer(async function(req, res) {
         }
       }
 
-      var action = params.WSO_SALE_ACTION || "";
-      var email = params.WSO_CUSTOMER_EMAIL || "";
-      var name = params.WSO_CUSTOMER_NAME || "";
-      var transactionId = params.WSO_TRANSACTION_ID || "";
+      // Support both old WSO_ fields and new WP_ fields
+      var action = (params.WP_ACTION || params.WSO_SALE_ACTION || "").toUpperCase();
+      var email = params.WP_BUYER_EMAIL || params.WSO_CUSTOMER_EMAIL || "";
+      var name = params.WP_BUYER_NAME || params.WSO_CUSTOMER_NAME || "";
+      var transactionId = params.WP_TXNID || params.WSO_TRANSACTION_ID || "";
 
       console.log("[WARRIORPLUS] Action: " + action + ", Email: " + email);
 
@@ -1094,7 +1112,7 @@ var server = http.createServer(async function(req, res) {
           var result = await createAccountFromWebhook("warriorplus", email, name, transactionId);
           await logWebhook("warriorplus", action, email, bodyStr, "Created/found user: " + result.userId);
         }
-      } else if (action === "REFUNDED" || action === "REVERSED") {
+      } else if (action === "REFUNDED" || action === "REFUND" || action === "REVERSED") {
         if (email) {
           await deactivateByEmail(email, "warriorplus");
           await logWebhook("warriorplus", action, email, bodyStr, "Deactivated");
