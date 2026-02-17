@@ -78,6 +78,34 @@
     .toggle-switch.active::after { transform: translateX(18px); }
     .security-note { font-size: 10px; color: #475569; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; line-height: 1.4; }
     .security-note svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; }
+
+    /* Account / Login Section */
+    .account-section { margin-bottom: 14px; }
+    .login-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
+    .login-box .login-title { font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 10px; }
+    .login-input-row { display: flex; gap: 6px; }
+    .login-input { flex: 1; padding: 9px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e2e8f0; font-size: 12px; font-family: monospace; outline: none; }
+    .login-input:focus { border-color: #3b82f6; }
+    .login-input::placeholder { color: #475569; }
+    .login-btn { padding: 9px 16px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; }
+    .login-btn:hover { filter: brightness(1.1); }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-status { font-size: 11px; margin-top: 6px; }
+    .login-status.error { color: #ef4444; }
+    .login-status.success { color: #10b981; }
+    .login-hint { font-size: 10px; color: #475569; margin-top: 6px; line-height: 1.4; }
+    .logged-in-box { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; }
+    .logged-in-info { display: flex; align-items: center; gap: 8px; }
+    .logged-in-avatar { width: 28px; height: 28px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .logged-in-avatar svg { width: 14px; height: 14px; }
+    .logged-in-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .logged-in-label { font-size: 10px; color: #10b981; }
+    .logged-in-actions { display: flex; gap: 10px; }
+    .logged-in-actions span { font-size: 11px; cursor: pointer; }
+    .logged-in-actions .guides-link { color: #f59e0b; }
+    .logged-in-actions .guides-link:hover { color: #fbbf24; }
+    .logged-in-actions .logout-link { color: #ef4444; }
+    .logged-in-actions .logout-link:hover { color: #f87171; }
   </style>
 </head>
 <body>
@@ -86,6 +114,34 @@
     <div><h1>StepWise</h1><small>Auto-capture documentation</small></div>
   </div>
   <div class="main" id="main">
+    <!-- Account: Login or Logged-in state -->
+    <div class="account-section" id="accountSection">
+      <!-- Not logged in -->
+      <div class="login-box" id="loginBox">
+        <div class="login-title">Log in with your API key</div>
+        <div class="login-input-row">
+          <input type="password" class="login-input" id="loginKeyInput" placeholder="sk_live_..." autocomplete="off">
+          <button class="login-btn" id="loginBtn">Log In</button>
+        </div>
+        <div class="login-status" id="loginStatus"></div>
+        <div class="login-hint">Paste the API key from your welcome email.</div>
+      </div>
+      <!-- Logged in -->
+      <div class="logged-in-box" id="loggedInBox" style="display:none">
+        <div class="logged-in-info">
+          <div class="logged-in-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div>
+            <div class="logged-in-name" id="loggedInName">Pro User</div>
+            <div class="logged-in-label">Logged in</div>
+          </div>
+        </div>
+        <div class="logged-in-actions">
+          <span class="guides-link" id="loggedInGuidesLink">My Guides</span>
+          <span class="logout-link" id="loggedInLogoutLink">Log Out</span>
+        </div>
+      </div>
+    </div>
+
     <div class="status" id="statusBar">
       <div class="status-dot idle" id="statusDot"></div>
       <span id="statusText">Ready to record</span>
@@ -187,11 +243,9 @@
 
   <div class="footer">
     <span>Help</span>
-    <span id="myGuidesLink" style="display:none;color:#f59e0b;">My Guides</span>
-    <span id="logoutLink" style="display:none;color:#ef4444;">Log Out</span>
     <span id="settingsLink">Settings</span>
     <span class="upgrade-link" id="upgradeLink">Upgrade to Pro</span>
-    <span>v1.1.0</span>
+    <span>v1.2.0</span>
   </div>
   <script src="popup.js"></script>
 </body>

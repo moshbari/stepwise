@@ -262,13 +262,23 @@ All extension versions are hosted as zip files at:
 - **Page source:** `server/downloads.html` (deployed as `index.html`)
 - **Deploy script:** `server/deploy-downloads.sh`
 
-### Releasing a New Version
-When extension code changes:
-1. Update `server/downloads.html` — add a new version card at the top (move "latest" badge)
-2. Run: `bash server/deploy-downloads.sh v1.X.0` (zips extension and uploads)
-3. Commit and push `server/downloads.html`
+### Releasing a New Version — MANDATORY CHECKLIST
+
+**IMPORTANT: Every time extension code is modified, ALL of these steps MUST be completed before the task is considered done. Do NOT skip any step. Do NOT wait for the user to remind you.**
+
+When ANY file in `extension/` is changed:
+1. **Bump version** in `extension/manifest.json` (increment minor for features, patch for fixes)
+2. **Update `server/downloads.html`** — add a new version card at the top with the changes, move "LATEST" badge from old version
+3. **Update the "Current Versions" list below** in this file
+4. Run: `bash server/deploy-downloads.sh v1.X.0` (zips extension and uploads)
+5. Commit and push all changes including `server/downloads.html` and this file
+
+**This is not optional.** The downloads page is how users get the extension. If it's not updated, users won't get the new features.
 
 ### Current Versions
+- **v1.5.0** (Feb 17, 2026) — Video generation uses server-provided OpenAI key (no user setup needed)
+- **v1.4.0** (Feb 17, 2026) — Add Video to Guide button, publish updates same guide instead of creating duplicates
+- **v1.3.0** (Feb 16, 2026) — API key login in popup, account card with My Guides & Log Out
 - **v1.2.0** (Feb 16, 2026) — WarriorPlus upgrade link, GHL email, WP webhook fix
 - **v1.1.0** (Feb 15, 2026) — Upgrade to Pro link, OpenAI API proxy
 - **v1.0.0** (Feb 14, 2026) — Initial release
@@ -350,5 +360,7 @@ Use the admin secret to call `/register`: `curl -X POST https://app.heychatmate.
 **DON'T:** Change the publish-config.json admin secret key — it's used for admin operations.
 
 **DON'T:** Modify users.json manually — use the `/register` and `/admin/users` API endpoints.
+
+**ALWAYS:** When ANY file in `extension/` is changed, you MUST also: (1) bump version in `manifest.json`, (2) update `server/downloads.html` with a new version card, (3) update the "Current Versions" list in this file. This is mandatory for every change — do not wait for the user to ask.
 
 **USER SKILL LEVEL:** Beginner. Explain everything simply. Use step-by-step instructions.

@@ -1377,6 +1377,24 @@ var server = http.createServer(async function(req, res) {
   // === OPENAI PROXY ENDPOINTS ===
   // ==========================================
 
+  // === OPENAI PROXY: Get key for video generation ===
+  if (req.method === "GET" && req.url === "/api/video-key") {
+    if (!OPENAI_API_KEY) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "AI proxy not configured" }));
+      return;
+    }
+    var authResult = await authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, apiKey: OPENAI_API_KEY }));
+    return;
+  }
+
   // === OPENAI PROXY: Whisper Transcription ===
   if (req.method === "POST" && req.url === "/api/transcribe") {
     if (!OPENAI_API_KEY) {

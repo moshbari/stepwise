@@ -40,6 +40,7 @@ var PUBLISH_API_URL = "https://app.heychatmate.com/stepwise-api";
 var PUBLISH_SECRET = ""; // Will be loaded from chrome.storage settings
 var USER_INDEX_URL = ""; // Will be loaded after API key validation
 var UPGRADE_URL = "https://stepwise.heychatmate.com/stepwise";
+var publishedSlug = null; // Tracks current guide's slug for updates
 
 // Ensure user has entered their StepWise API key before using any feature
 async function ensureApiKey() {
@@ -217,6 +218,7 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("aiAllBtn").addEventListener("click", generateAllDescriptions);
   document.getElementById("ttsPlayAllBtn").addEventListener("click", ttsPlayAll);
   document.getElementById("generateVideoBtn").addEventListener("click", startVideoGeneration);
+  document.getElementById("addVideoToGuideBtn").addEventListener("click", addVideoToGuide);
   document.getElementById("videoCancelBtn").addEventListener("click", cancelVideoGeneration);
   document.getElementById("upgradePanelBtn").addEventListener("click", function() { window.open(UPGRADE_URL, "_blank"); });
   document.getElementById("ttsVoiceSelect").addEventListener("change", function() {
@@ -2617,7 +2619,12 @@ async function generateHTMLContent() {
 
   var logoH = brand.logo ? '<img src="' + brand.logo + '" class="logo">' : '<div style="font-size:14px;font-weight:700;color:' + brand.primaryColor + ';margin-bottom:8px;">' + esc(brand.name) + '</div>';
 
-  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>' + esc(title) + '</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}body{font-family:"Inter",-apple-system,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}.container{max-width:800px;margin:0 auto;padding:40px 24px}.header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid #e2e8f0}.logo{max-height:40px;margin-bottom:16px}h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;color:#0f172a;margin-bottom:8px}.subtitle{font-size:16px;color:#64748b}.meta{font-size:12px;color:#94a3b8;margin-top:12px}.step{margin-bottom:40px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}.step-header{display:flex;align-items:center;gap:12px;padding:16px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0}.step-num{width:32px;height:32px;border-radius:50%;background:' + brand.primaryColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}.step-title{font-size:16px;font-weight:600}.step-body{padding:20px}.step-screenshot{width:100%;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px}.step-description{font-size:15px;color:#475569;line-height:1.7}.step-url{font-size:11px;color:#94a3b8;font-family:monospace;margin-top:8px;padding:4px 8px;background:#f1f5f9;border-radius:4px;display:inline-block}.footer{text-align:center;padding:32px 0;border-top:1px solid #e2e8f0;margin-top:48px;font-size:12px;color:#94a3b8}.toc{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:24px;margin-bottom:40px}.toc h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:12px}.toc-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155;text-decoration:none}.toc-item:last-child{border-bottom:none}.toc-item:hover{color:' + brand.primaryColor + '}.toc-num{width:24px;height:24px;border-radius:50%;background:' + brand.primaryColor + '15;color:' + brand.primaryColor + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}@media print{body{background:#fff}.step{break-inside:avoid;box-shadow:none}}</style></head><body><div class="container"><div class="header">' + logoH + '<h1>' + esc(title) + '</h1>' + (subtitle ? '<p class="subtitle">' + esc(subtitle) + '</p>' : '') + '<p class="meta">' + state.steps.length + ' steps \u2022 Generated ' + new Date().toLocaleDateString() + '</p></div><div class="toc"><h2>Table of Contents</h2>' + tocHtml + '</div>' + stepsHtml + '<div class="footer">Created with StepWise \u2022 ' + esc(brand.name) + ' \u2022 ' + new Date().getFullYear() + '</div></div></body></html>';
+  var videoHtml = "";
+  if (state.videoUrl) {
+    videoHtml = '<div class="video-section"><video controls playsinline preload="metadata"><source src="' + state.videoUrl + '" type="video/mp4">Your browser does not support the video tag.</video></div>';
+  }
+
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>' + esc(title) + '</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}body{font-family:"Inter",-apple-system,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}.container{max-width:800px;margin:0 auto;padding:40px 24px}.header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid #e2e8f0}.logo{max-height:40px;margin-bottom:16px}h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;color:#0f172a;margin-bottom:8px}.subtitle{font-size:16px;color:#64748b}.meta{font-size:12px;color:#94a3b8;margin-top:12px}.video-section{margin-bottom:40px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}.video-section video{width:100%;display:block;max-height:500px}.step{margin-bottom:40px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}.step-header{display:flex;align-items:center;gap:12px;padding:16px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0}.step-num{width:32px;height:32px;border-radius:50%;background:' + brand.primaryColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}.step-title{font-size:16px;font-weight:600}.step-body{padding:20px}.step-screenshot{width:100%;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px}.step-description{font-size:15px;color:#475569;line-height:1.7}.step-url{font-size:11px;color:#94a3b8;font-family:monospace;margin-top:8px;padding:4px 8px;background:#f1f5f9;border-radius:4px;display:inline-block}.footer{text-align:center;padding:32px 0;border-top:1px solid #e2e8f0;margin-top:48px;font-size:12px;color:#94a3b8}.toc{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:24px;margin-bottom:40px}.toc h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:12px}.toc-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155;text-decoration:none}.toc-item:last-child{border-bottom:none}.toc-item:hover{color:' + brand.primaryColor + '}.toc-num{width:24px;height:24px;border-radius:50%;background:' + brand.primaryColor + '15;color:' + brand.primaryColor + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}@media print{body{background:#fff}.step{break-inside:avoid;box-shadow:none}}</style></head><body><div class="container"><div class="header">' + logoH + '<h1>' + esc(title) + '</h1>' + (subtitle ? '<p class="subtitle">' + esc(subtitle) + '</p>' : '') + '<p class="meta">' + state.steps.length + ' steps \u2022 Generated ' + new Date().toLocaleDateString() + '</p></div>' + videoHtml + '<div class="toc"><h2>Table of Contents</h2>' + tocHtml + '</div>' + stepsHtml + '<div class="footer">Created with StepWise \u2022 ' + esc(brand.name) + ' \u2022 ' + new Date().getFullYear() + '</div></div></body></html>';
 }
 
 async function exportHTML() { var h = await generateHTMLContent(); dlFile(h, slug(document.getElementById("docTitle").value || "doc") + ".html", "text/html"); showToast("HTML exported!"); }
@@ -2643,16 +2650,19 @@ async function shareDoc() {
     var html = await generateHTMLContent();
     var title = document.getElementById("docTitle").value || "Untitled Guide";
 
+    var publishBody = { html: html, title: title };
+    if (publishedSlug) {
+      publishBody.slug = publishedSlug;
+      publishBody.overwrite = true;
+    }
+
     var response = await fetch(PUBLISH_API_URL + "/publish", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + PUBLISH_SECRET
       },
-      body: JSON.stringify({
-        html: html,
-        title: title
-      })
+      body: JSON.stringify(publishBody)
     });
 
     var data = await response.json();
@@ -2661,20 +2671,24 @@ async function shareDoc() {
       throw new Error(data.error || "Publish failed");
     }
 
+    publishedSlug = data.slug;
     urlInput.value = data.url;
     resultDiv.style.display = "block";
     btn.textContent = "🌐 Publish — Get Link";
     btn.disabled = false;
-    showToast("Published! Link is permanent.");
+    var isUpdate = publishBody.overwrite;
+    showToast(isUpdate ? "Guide updated!" : "Published! Link is permanent.");
 
-    // Save to publish history
-    saveShareLink({
-      url: data.url,
-      title: title,
-      steps: state.steps.length,
-      slug: data.slug,
-      createdAt: new Date().toISOString()
-    });
+    // Save to publish history (only on first publish, not updates)
+    if (!isUpdate) {
+      saveShareLink({
+        url: data.url,
+        title: title,
+        steps: state.steps.length,
+        slug: data.slug,
+        createdAt: new Date().toISOString()
+      });
+    }
 
   } catch(err) {
     btn.textContent = "🌐 Publish — Get Link";
@@ -2825,6 +2839,7 @@ function dlFile(c, f, m) { var b = new Blob([c], { type: m }); var u = URL.creat
 var videoJobId = null;
 var videoPollTimer = null;
 var videoCancelled = false;
+var lastVideoGhlUrl = null;
 
 async function startVideoGeneration() {
   if (!(await ensureApiKey())) return;
@@ -2840,18 +2855,22 @@ async function startVideoGeneration() {
     return;
   }
 
-  // Get API key via background.js (which has the working decrypt)
-  chrome.runtime.sendMessage({ action: "GET_API_KEY" }, function(result) {
-    if (chrome.runtime.lastError || !result || !result.success) {
-      showToast("Set up your OpenAI API key in Settings first");
-      return;
-    }
-
-    var apiKey = result.apiKey;
-    if (!apiKey || apiKey.length < 10) {
-      showToast("Invalid API key. Check Settings.");
-      return;
-    }
+  // Get OpenAI API key from server (same proxy as TTS uses)
+  var keyRes;
+  try {
+    keyRes = await fetch(PUBLISH_API_URL + "/api/video-key", {
+      headers: { "Authorization": "Bearer " + PUBLISH_SECRET }
+    });
+  } catch (err) {
+    showToast("Could not connect to server");
+    return;
+  }
+  var keyData = await keyRes.json();
+  if (!keyRes.ok || !keyData.success || !keyData.apiKey) {
+    showToast(keyData.error || "Could not get video key from server");
+    return;
+  }
+  var apiKey = keyData.apiKey;
 
     // Show modal early so user sees progress
     videoCancelled = false;
@@ -2920,7 +2939,6 @@ async function startVideoGeneration() {
     });
 
     }); // end Promise.all(mergePromises).then()
-  }); // end chrome.runtime.sendMessage
 } // end startVideoGeneration
 
 function pollVideoProgress(vpsUrl, jobId) {
@@ -3001,7 +3019,8 @@ function downloadVideoNoClose(vpsUrl, jobId, fileName) {
 
 // Show the GHL link with a Copy button
 function showGHLLink(ghlUrl) {
-  document.getElementById("videoModalMsg").innerHTML = 
+  lastVideoGhlUrl = ghlUrl;
+  document.getElementById("videoModalMsg").innerHTML =
     "\u2705 Video downloaded to your computer.<br><br>" +
     "\u2705 <b>Saved to GoHighLevel!</b><br><br>" +
     "<div style='background:#f0f0ff;border:1px solid #c7c7f7;border-radius:8px;padding:10px;margin:6px 0;word-break:break-all;font-size:12px;'>" +
@@ -3108,6 +3127,70 @@ function resetVideoUI() {
   var btn = document.getElementById("generateVideoBtn");
   btn.disabled = false;
   btn.textContent = "\ud83c\udfac Generate MP4 Video";
+}
+
+async function addVideoToGuide() {
+  // Check if guide is published
+  var shareUrlInput = document.getElementById("shareUrlInput");
+  var publishedUrl = shareUrlInput ? shareUrlInput.value : "";
+  if (!publishedUrl) {
+    showToast("Publish the guide first");
+    return;
+  }
+
+  // Check if video URL exists
+  if (!lastVideoGhlUrl) {
+    showToast("Generate a video first");
+    return;
+  }
+
+  var btn = document.getElementById("addVideoToGuideBtn");
+  btn.disabled = true;
+  btn.textContent = "\u23f3 Adding video...";
+
+  try {
+    // Store video URL in state
+    state.videoUrl = lastVideoGhlUrl;
+
+    // Re-generate HTML with video embedded
+    var html = await generateHTMLContent();
+    var title = document.getElementById("docTitle").value || "Untitled Guide";
+
+    // Extract slug from published URL
+    var parts = publishedUrl.split("/");
+    var fileName = parts[parts.length - 1];
+    var slug = fileName.replace(".html", "");
+
+    // Re-publish with overwrite
+    var response = await fetch(PUBLISH_API_URL + "/publish", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + PUBLISH_SECRET
+      },
+      body: JSON.stringify({
+        html: html,
+        title: title,
+        slug: slug,
+        overwrite: true
+      })
+    });
+
+    var data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Publish failed");
+    }
+
+    btn.textContent = "\ud83d\udcce Add Video to Guide";
+    btn.disabled = false;
+    showToast("Video added to guide!");
+  } catch(err) {
+    btn.textContent = "\ud83d\udcce Add Video to Guide";
+    btn.disabled = false;
+    showToast("Failed: " + err.message);
+    console.error("Add video error:", err);
+  }
 }
 
 // Video generation uses background.js GET_API_KEY for secure key access

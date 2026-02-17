@@ -40,9 +40,13 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("downloadJsonBtn").addEventListener("click", downloadJSON);
   document.getElementById("clearBtn").addEventListener("click", clearAll);
 
-  // My Guides + Log Out links
-  document.getElementById("myGuidesLink").addEventListener("click", openMyGuides);
-  document.getElementById("logoutLink").addEventListener("click", logoutAccount);
+  // Login / Account
+  document.getElementById("loginBtn").addEventListener("click", loginWithApiKey);
+  document.getElementById("loginKeyInput").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") loginWithApiKey();
+  });
+  document.getElementById("loggedInGuidesLink").addEventListener("click", openMyGuides);
+  document.getElementById("loggedInLogoutLink").addEventListener("click", logoutAccount);
 
   // Upgrade to Pro
   document.getElementById("upgradeLink").addEventListener("click", function() {
@@ -148,17 +152,80 @@ function updateVoiceToggles() {
   });
 }
 
-// --- Account Links (My Guides + Log Out) ---
+// --- Account (Login / Logged-in) ---
 function updateAccountLinks() {
-  chrome.storage.local.get(["publishSecret", "userIndexUrl"], function(result) {
+  chrome.storage.local.get(["publishSecret", "userIndexUrl", "userName"], function(result) {
     var loggedIn = result.publishSecret && result.publishSecret.length > 0;
-    var hasUrl = loggedIn && result.userIndexUrl;
-    var guidesLink = document.getElementById("myGuidesLink");
-    var logoutLink = document.getElementById("logoutLink");
+    var loginBox = document.getElementById("loginBox");
+    var loggedInBox = document.getElementById("loggedInBox");
     var proNote = document.getElementById("proNote");
-    if (guidesLink) guidesLink.style.display = hasUrl ? "inline" : "none";
-    if (logoutLink) logoutLink.style.display = loggedIn ? "inline" : "none";
+
+    if (loggedIn) {
+      loginBox.style.display = "none";
+      loggedInBox.style.display = "flex";
+      var nameEl = document.getElementById("loggedInName");
+      if (nameEl) nameEl.textContent = result.userName || "Pro User";
+      // Show/hide My Guides based on whether we have the URL
+      var guidesLink = document.getElementById("loggedInGuidesLink");
+      if (guidesLink) guidesLink.style.display = result.userIndexUrl ? "inline" : "none";
+    } else {
+      loginBox.style.display = "block";
+      loggedInBox.style.display = "none";
+    }
     if (proNote) proNote.style.display = loggedIn ? "block" : "none";
+  });
+}
+
+function loginWithApiKey() {
+  var input = document.getElementById("loginKeyInput");
+  var btn = document.getElementById("loginBtn");
+  var statusEl = document.getElementById("loginStatus");
+  var key = input.value.trim();
+
+  if (!key) {
+    statusEl.textContent = "Please paste your API key";
+    statusEl.className = "login-status error";
+    return;
+  }
+  if (!key.startsWith("sk_live_")) {
+    statusEl.textContent = "Key should start with sk_live_";
+    statusEl.className = "login-status error";
+    return;
+  }
+
+  // Disable button while validating
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  statusEl.textContent = "";
+
+  fetch("https://app.heychatmate.com/stepwise-api/me", {
+    headers: { "Authorization": "Bearer " + key }
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.success) {
+      // Save to chrome.storage
+      chrome.storage.local.set({
+        publishSecret: key,
+        userIndexUrl: data.indexUrl || "",
+        userName: data.name || ""
+      }, function() {
+        statusEl.textContent = "";
+        input.value = "";
+        updateAccountLinks();
+      });
+    } else {
+      statusEl.textContent = data.error || "Invalid API key";
+      statusEl.className = "login-status error";
+      btn.disabled = false;
+      btn.textContent = "Log In";
+    }
+  })
+  .catch(function() {
+    statusEl.textContent = "Connection error. Try again.";
+    statusEl.className = "login-status error";
+    btn.disabled = false;
+    btn.textContent = "Log In";
   });
 }
 
