@@ -737,6 +737,20 @@ var server = http.createServer(async function(req, res) {
     return;
   }
 
+  // === REBUILD INDEX: Force-regenerate user's index page ===
+  if (req.method === "POST" && req.url === "/rebuild-index") {
+    var authResult = await authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+    await rebuildUserIndex(authResult.userId);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
   // === ME: Get current user info from API key ===
   if (req.method === "GET" && req.url === "/me") {
     var authResult = await authenticateUser(req);
