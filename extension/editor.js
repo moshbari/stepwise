@@ -2428,6 +2428,9 @@ async function loadProject() {
 
     // Accept both project format and plain JSON export
     if (data.format === "stepwise-project" || data.steps) {
+      // Reset per-project state so new project doesn't overwrite old guide
+      resetProjectState();
+
       state.steps = data.steps || [];
       state.steps.forEach(function(s) { if (!s.annotations) s.annotations = []; });
 
@@ -2596,8 +2599,21 @@ function pullNewSteps() {
 // ============================================================
 
 function importJSON() { document.getElementById("jsonFileInput").click(); }
-function handleJSONImport(e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function(ev) { try { var d = JSON.parse(ev.target.result); if (d.steps) { state.steps = d.steps; state.steps.forEach(function(s) { if (!s.annotations) s.annotations = []; }); state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null; showEditor(); render(); showToast("Imported " + state.steps.length + " steps"); } } catch(ex) { alert("Invalid JSON: " + ex.message); } }; r.readAsText(f); }
-function handleDrop(e) { e.preventDefault(); e.currentTarget.classList.remove("dragover"); var f = e.dataTransfer.files[0]; if (f && f.name.endsWith(".json")) { var r = new FileReader(); r.onload = function(ev) { try { var d = JSON.parse(ev.target.result); if (d.steps) { state.steps = d.steps; state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null; showEditor(); render(); } } catch(ex) { alert("Invalid JSON"); } }; r.readAsText(f); } }
+function resetProjectState() {
+  publishedSlug = null;
+  lastVideoGhlUrl = null;
+  state.videoUrl = null;
+  videoJobId = null;
+  if (videoPollTimer) { clearTimeout(videoPollTimer); videoPollTimer = null; }
+  videoCancelled = false;
+  var srd = document.getElementById("shareResult"); if (srd) srd.style.display = "none";
+  var sue = document.getElementById("shareUrlInput"); if (sue) sue.value = "";
+  if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+  ttsPlayingSid = null; ttsPlayAllMode = false; ttsPlayAllIndex = 0; ttsAudioCache = {};
+  annoState = {}; window._stepnumCounter = {}; pendingScreenshotStepId = null;
+}
+function handleJSONImport(e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function(ev) { try { var d = JSON.parse(ev.target.result); if (d.steps) { resetProjectState(); state.steps = d.steps; state.steps.forEach(function(s) { if (!s.annotations) s.annotations = []; }); state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null; showEditor(); render(); showToast("Imported " + state.steps.length + " steps"); } } catch(ex) { alert("Invalid JSON: " + ex.message); } }; r.readAsText(f); }
+function handleDrop(e) { e.preventDefault(); e.currentTarget.classList.remove("dragover"); var f = e.dataTransfer.files[0]; if (f && f.name.endsWith(".json")) { var r = new FileReader(); r.onload = function(ev) { try { var d = JSON.parse(ev.target.result); if (d.steps) { resetProjectState(); state.steps = d.steps; state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null; showEditor(); render(); } } catch(ex) { alert("Invalid JSON"); } }; r.readAsText(f); } }
 function exportJSONFile() { var d = { version: "1.0", title: state.title, brand: state.brand, exportedAt: new Date().toISOString(), steps: state.steps }; dlFile(JSON.stringify(d, null, 2), "stepwise-" + slug(state.title) + ".json", "application/json"); showToast("JSON exported!"); }
 
 async function generateHTMLContent() {

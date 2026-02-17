@@ -276,6 +276,7 @@ When ANY file in `extension/` is changed:
 **This is not optional.** The downloads page is how users get the extension. If it's not updated, users won't get the new features.
 
 ### Current Versions
+- **v1.6.0** (Feb 17, 2026) — Fix: loading new project no longer overwrites previously published guides
 - **v1.5.0** (Feb 17, 2026) — Video generation uses server-provided OpenAI key (no user setup needed)
 - **v1.4.0** (Feb 17, 2026) — Add Video to Guide button, publish updates same guide instead of creating duplicates
 - **v1.3.0** (Feb 16, 2026) — API key login in popup, account card with My Guides & Log Out
