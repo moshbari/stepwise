@@ -506,10 +506,11 @@ async function rebuildUserIndex(userId) {
 
     // Guides section
     guides.forEach(function(g) {
-      var dateStr = new Date(g.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+      var gd = new Date(g.created_at);
+      var dateStr = gd.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) + " " + gd.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Dubai" });
       var sizeKB = Math.round((g.file_size || 0) / 1024);
       html += '<div class="guide-row">\n' +
-        '<a class="guide-card" href="' + g.file_name + '">\n' +
+        '<a class="guide-card" href="' + g.file_name + '" target="_blank">\n' +
         '  <div class="guide-title">' + (g.title || "").replace(/</g, "&lt;") + '</div>\n' +
         '  <div class="guide-meta">\n' +
         '    <i>&#x1F4C5; ' + dateStr + '</i>\n' +
@@ -528,7 +529,8 @@ async function rebuildUserIndex(userId) {
       }
       html += '<div class="section-label">&#x1F3AC; Videos</div>\n';
       videos.forEach(function(v) {
-        var dateStr = new Date(v.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+        var vd = new Date(v.created_at);
+        var dateStr = vd.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) + " " + vd.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Dubai" });
         html += '<div class="guide-row">\n' +
           '<a class="video-card" href="' + (v.ghl_url || "").replace(/"/g, '&quot;') + '" target="_blank">\n' +
           '  <div class="guide-title">' + (v.title || "Untitled Video").replace(/</g, "&lt;") + '</div>\n' +

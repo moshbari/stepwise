@@ -74,6 +74,13 @@ function hasApiKey() {
 function updateLockedUI() {
   var locked = !hasApiKey();
 
+  // Hide Upgrade to Pro section if user already has API key
+  var upgradeBtn = document.getElementById("upgradePanelBtn");
+  if (upgradeBtn) {
+    var proSection = upgradeBtn.closest(".panel-section");
+    if (proSection) proSection.style.display = locked ? "" : "none";
+  }
+
   // Brand settings fields
   var brandIds = ["brandName", "brandColor", "brandColorHex", "accentColor", "accentColorHex"];
   brandIds.forEach(function(id) {
