@@ -96,10 +96,10 @@ function loadSettings() {
       keyStatus.textContent = "\u26a0 No API key saved";
       keyStatus.className = "key-status empty";
     }
-    voiceEnabled = result.voiceEnabled !== undefined ? result.voiceEnabled : (hasKey ? true : false);
+    voiceEnabled = result.voiceEnabled !== undefined ? result.voiceEnabled : true;
     updateVoiceToggles();
-    // If API key exists and voice was auto-enabled, save it so content.js picks it up
-    if (hasKey && result.voiceEnabled === undefined) {
+    // Auto-enable voice by default so content.js picks it up
+    if (result.voiceEnabled === undefined) {
       chrome.storage.local.set({ voiceEnabled: true });
     }
   });

@@ -391,7 +391,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       showRecordingIndicator();
       // Check if voice is enabled and start mic
       chrome.storage.local.get(["voiceEnabled"], function(result) {
-        voiceEnabled = result.voiceEnabled || false;
+        voiceEnabled = result.voiceEnabled !== undefined ? result.voiceEnabled : true;
         console.log("StepWise Voice: Recording started. voiceEnabled from storage:", voiceEnabled);
         if (voiceEnabled) startVoiceRecording();
       });
