@@ -145,7 +145,13 @@ function updateLockedUI() {
   var cloudBtns = ["saveCloudBtn", "loadCloudBtn", "loadCloudBtnHome", "importGuideBtnHome"];
   cloudBtns.forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) el.style.display = locked ? "none" : "";
+    if (el) {
+      if (locked) {
+        el.style.display = "none";
+      } else {
+        el.style.removeProperty("display");
+      }
+    }
   });
 }
 
