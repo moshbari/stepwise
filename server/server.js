@@ -13,6 +13,7 @@ const nodemailer = require("nodemailer");
 // === CONFIG ===
 const PORT = 3600;
 const GUIDES_DIR = "/home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise";
+const PROJECTS_DIR = path.join(__dirname, "projects");
 const BASE_URL = "https://app.heychatmate.com/stepwise";
 const SECRET = crypto.randomBytes(32).toString("hex");
 
@@ -619,11 +620,20 @@ async function rebuildUserIndex(userId) {
   console.log("[INDEX] Rebuilt " + userId + " with " + guides.length + " guides, " + videos.length + " videos");
 }
 
-// Read full request body as string
-function readBody(req) {
+// Read full request body as string (optional maxSize in bytes)
+function readBody(req, maxSize) {
   return new Promise(function(resolve, reject) {
     var chunks = [];
-    req.on("data", function(chunk) { chunks.push(chunk); });
+    var totalSize = 0;
+    req.on("data", function(chunk) {
+      totalSize += chunk.length;
+      if (maxSize && totalSize > maxSize) {
+        req.destroy();
+        reject(new Error("Request body too large (limit: " + Math.round(maxSize / 1024 / 1024) + "MB)"));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on("end", function() { resolve(Buffer.concat(chunks).toString()); });
     req.on("error", reject);
   });
@@ -927,6 +937,180 @@ var server = http.createServer(async function(req, res) {
 
     // Rebuild this user's index page
     await rebuildUserIndex(userId);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  // === SAVE PROJECT: Save editable project data to cloud (user-scoped) ===
+  if (req.method === "POST" && req.url === "/save-project") {
+    try {
+      var authResult = await authenticateUser(req);
+      if (!authResult) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+        return;
+      }
+
+      var userId = authResult.userId;
+      var body = await readBody(req, 50 * 1024 * 1024); // 50MB limit
+      var data = JSON.parse(body);
+
+      if (!data.slug || !data.title || !data.project) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ success: false, error: "Missing slug, title, or project data" }));
+        return;
+      }
+
+      // Validate slug format (only a-z, 0-9, hyphens)
+      var safeSlug = data.slug.replace(/[^a-z0-9-]/g, "");
+      if (!safeSlug || safeSlug !== data.slug) {
+        safeSlug = makeSlug(data.title);
+      }
+
+      // Create user project directory
+      var userProjectDir = path.join(PROJECTS_DIR, userId);
+      if (!fs.existsSync(userProjectDir)) {
+        fs.mkdirSync(userProjectDir, { recursive: true });
+      }
+
+      // Save project JSON file
+      var projectJson = JSON.stringify(data.project);
+      var filePath = path.join(userProjectDir, safeSlug + ".json");
+      fs.writeFileSync(filePath, projectJson, "utf8");
+      fs.chmodSync(filePath, "600");
+
+      var stepCount = data.project.steps ? data.project.steps.length : 0;
+
+      // Upsert into database
+      await pool.execute(
+        "INSERT INTO projects (user_id, slug, title, file_size, step_count) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title = VALUES(title), file_size = VALUES(file_size), step_count = VALUES(step_count), updated_at = CURRENT_TIMESTAMP",
+        [userId, safeSlug, data.title, projectJson.length, stepCount]
+      );
+
+      console.log("[SAVE-PROJECT] " + userId + "/" + safeSlug + " (" + Math.round(projectJson.length / 1024) + " KB, " + stepCount + " steps)");
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, slug: safeSlug }));
+    } catch (err) {
+      console.error("[SAVE-PROJECT ERROR]", err.message);
+      var statusCode = err.message.includes("too large") ? 413 : 500;
+      res.writeHead(statusCode, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // === LIST PROJECTS: List saved projects (user-scoped) ===
+  if (req.method === "GET" && req.url === "/projects") {
+    var authResult = await authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+
+    var userId = authResult.userId;
+
+    try {
+      var [rows] = await pool.execute(
+        "SELECT p.slug, p.title, p.file_size, p.step_count, p.updated_at, (SELECT COUNT(*) FROM guides g WHERE g.user_id = p.user_id AND g.slug = p.slug) as has_guide FROM projects p WHERE p.user_id = ? ORDER BY p.updated_at DESC",
+        [userId]
+      );
+
+      var projects = rows.map(function(r) {
+        return {
+          slug: r.slug,
+          title: r.title,
+          fileSize: r.file_size,
+          stepCount: r.step_count,
+          savedAt: r.updated_at,
+          hasPublishedGuide: r.has_guide > 0
+        };
+      });
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, projects: projects }));
+    } catch (err) {
+      console.error("[LIST-PROJECTS ERROR]", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // === GET PROJECT: Load a saved project (user-scoped) ===
+  if (req.method === "GET" && req.url.startsWith("/project/")) {
+    var authResult = await authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+
+    var userId = authResult.userId;
+    var projectSlug = req.url.replace("/project/", "").replace(/[^a-z0-9-]/g, "");
+
+    if (!projectSlug) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Missing slug" }));
+      return;
+    }
+
+    // Verify ownership via database
+    var [rows] = await pool.execute("SELECT slug FROM projects WHERE user_id = ? AND slug = ?", [userId, projectSlug]);
+    if (rows.length === 0) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Project not found" }));
+      return;
+    }
+
+    var filePath = path.join(PROJECTS_DIR, userId, projectSlug + ".json");
+    if (!fs.existsSync(filePath)) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Project file not found" }));
+      return;
+    }
+
+    // Stream the file to response (can be 10-20MB)
+    var stat = fs.statSync(filePath);
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Content-Length": stat.size
+    });
+    fs.createReadStream(filePath).pipe(res);
+    return;
+  }
+
+  // === DELETE PROJECT: Remove a saved project (user-scoped) ===
+  if (req.method === "DELETE" && req.url.startsWith("/delete-project/")) {
+    var authResult = await authenticateUser(req);
+    if (!authResult) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
+      return;
+    }
+
+    var userId = authResult.userId;
+    var projectSlug = req.url.replace("/delete-project/", "").replace(/[^a-z0-9-]/g, "");
+
+    // Verify ownership
+    var [rows] = await pool.execute("SELECT slug FROM projects WHERE user_id = ? AND slug = ?", [userId, projectSlug]);
+    if (rows.length === 0) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, error: "Project not found" }));
+      return;
+    }
+
+    var filePath = path.join(PROJECTS_DIR, userId, projectSlug + ".json");
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    await pool.execute("DELETE FROM projects WHERE user_id = ? AND slug = ?", [userId, projectSlug]);
+
+    console.log("[DELETE-PROJECT] " + userId + "/" + projectSlug);
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true }));
