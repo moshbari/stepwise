@@ -276,6 +276,7 @@ When ANY file in `extension/` is changed:
 **This is not optional.** The downloads page is how users get the extension. If it's not updated, users won't get the new features.
 
 ### Current Versions
+- **v1.9.0** (Feb 18, 2026) — URLs in step descriptions and page URLs are now clickable links in published guides
 - **v1.8.0** (Feb 18, 2026) — Voice auto-dictation ON by default, popup version display fixed
 - **v1.7.0** (Feb 17, 2026) — Dubai time on dates, guide links open in new tab, hide Upgrade to Pro for Pro users
 - **v1.6.0** (Feb 17, 2026) — Fix: loading new project no longer overwrites previously published guides

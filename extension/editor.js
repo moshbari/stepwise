@@ -2635,8 +2635,8 @@ async function generateHTMLContent() {
     tocHtml += '<a href="#step-' + (i+1) + '" class="toc-item"><div class="toc-num">' + (i+1) + '</div>' + esc(s.title || "Untitled") + '</a>';
     stepsHtml += '<div class="step" id="step-' + (i+1) + '"><div class="step-header"><div class="step-num">' + (i+1) + '</div><div class="step-title">' + esc(s.title || "Untitled") + '</div></div><div class="step-body">';
     if (merged[i]) stepsHtml += '<img src="' + merged[i] + '" class="step-screenshot">';
-    if (s.description) stepsHtml += '<p class="step-description">' + esc(s.description) + '</p>';
-    if (s.url) stepsHtml += '<div class="step-url">' + esc(s.url) + '</div>';
+    if (s.description) stepsHtml += '<p class="step-description">' + linkify(s.description) + '</p>';
+    if (s.url) stepsHtml += '<div class="step-url"><a href="' + esc(s.url) + '" target="_blank" rel="noopener" style="color:#94a3b8;">' + esc(s.url) + '</a></div>';
     stepsHtml += '</div></div>';
   });
 
@@ -2850,6 +2850,7 @@ function loadDemoData() {
 function showEditor() { document.getElementById("importArea").style.display = "none"; document.getElementById("editorArea").style.display = "block"; }
 function showToast(m) { var t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); setTimeout(function() { t.classList.remove("show"); }, 2500); }
 function esc(s) { var d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+function linkify(s) { return esc(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:underline;">$1</a>'); }
 function escAttr(s) { return (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 function slug(s) { return (s || "doc").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").substring(0, 50); }
 function hostname(u) { try { return new URL(u).hostname; } catch(e) { return ""; } }
