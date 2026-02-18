@@ -142,7 +142,7 @@ function updateLockedUI() {
   });
 
   // Show/hide cloud buttons for Pro users
-  var cloudBtns = ["saveCloudBtn", "loadCloudBtnHome", "importGuideBtnHome"];
+  var cloudBtns = ["saveCloudBtn", "loadCloudBtn", "loadCloudBtnHome", "importGuideBtnHome"];
   cloudBtns.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = locked ? "none" : "";
@@ -258,6 +258,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // --- Cloud Save/Load ---
   document.getElementById("saveCloudBtn").addEventListener("click", saveToCloud);
+  document.getElementById("loadCloudBtn").addEventListener("click", loadFromCloudList);
   document.getElementById("loadCloudBtnHome").addEventListener("click", loadFromCloudList);
   document.getElementById("importGuideBtnHome").addEventListener("click", importFromGuideList);
   document.getElementById("cloudModalClose").addEventListener("click", function() { document.getElementById("cloudModal").style.display = "none"; });
