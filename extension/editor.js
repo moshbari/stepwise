@@ -140,6 +140,13 @@ function updateLockedUI() {
       if (tbOverlay) tbOverlay.remove();
     }
   });
+
+  // Show/hide cloud buttons for Pro users
+  var cloudBtns = ["saveCloudBtn", "loadCloudBtnHome", "importGuideBtnHome"];
+  cloudBtns.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = locked ? "none" : "";
+  });
 }
 
 // Fetch userId and index URL from server, store in chrome.storage
@@ -248,6 +255,12 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("loadProjectBtn").addEventListener("click", loadProject);
   document.getElementById("loadProjectBtnHome").addEventListener("click", loadProject);
   document.getElementById("importJsonBtnHome").addEventListener("click", function() { document.getElementById("jsonFileInput").click(); });
+
+  // --- Cloud Save/Load ---
+  document.getElementById("saveCloudBtn").addEventListener("click", saveToCloud);
+  document.getElementById("loadCloudBtnHome").addEventListener("click", loadFromCloudList);
+  document.getElementById("importGuideBtnHome").addEventListener("click", importFromGuideList);
+  document.getElementById("cloudModalClose").addEventListener("click", function() { document.getElementById("cloudModal").style.display = "none"; });
 
   // --- Continue Recording from Editor ---
   document.getElementById("editorContinueRecBtn").addEventListener("click", editorStartRecording);
@@ -2623,6 +2636,369 @@ function handleJSONImport(e) { var f = e.target.files[0]; if (!f) return; var r 
 function handleDrop(e) { e.preventDefault(); e.currentTarget.classList.remove("dragover"); var f = e.dataTransfer.files[0]; if (f && f.name.endsWith(".json")) { var r = new FileReader(); r.onload = function(ev) { try { var d = JSON.parse(ev.target.result); if (d.steps) { resetProjectState(); state.steps = d.steps; state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null; showEditor(); render(); } } catch(ex) { alert("Invalid JSON"); } }; r.readAsText(f); } }
 function exportJSONFile() { var d = { version: "1.0", title: state.title, brand: state.brand, exportedAt: new Date().toISOString(), steps: state.steps }; dlFile(JSON.stringify(d, null, 2), "stepwise-" + slug(state.title) + ".json", "application/json"); showToast("JSON exported!"); }
 
+// ============================================================
+// CLOUD SAVE / LOAD / IMPORT FROM PUBLISHED GUIDE
+// ============================================================
+
+async function saveToCloud() {
+  if (!(await ensureApiKey())) return;
+  if (state.steps.length === 0) { showToast("No steps to save"); return; }
+
+  var btn = document.getElementById("saveCloudBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Saving...";
+
+  try {
+    var title = document.getElementById("docTitle").value || "Untitled Guide";
+    var projectData = {
+      format: "stepwise-project",
+      version: "1.1",
+      title: title,
+      subtitle: document.getElementById("docSubtitle").value || "",
+      brand: state.brand,
+      steps: state.steps,
+      savedAt: new Date().toISOString()
+    };
+
+    var saveSlug = publishedSlug || slug(title);
+
+    var response = await fetch(PUBLISH_API_URL + "/save-project", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + PUBLISH_SECRET
+      },
+      body: JSON.stringify({ slug: saveSlug, title: title, project: projectData })
+    });
+
+    var data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || "Save failed");
+
+    if (!publishedSlug) publishedSlug = data.slug;
+
+    var statusDiv = document.getElementById("cloudSaveStatus");
+    statusDiv.style.display = "block";
+    statusDiv.textContent = "☁️ Saved " + new Date().toLocaleTimeString();
+    showToast("Project saved to cloud!");
+  } catch (err) {
+    showToast("Cloud save failed: " + err.message);
+    console.error("Cloud save error:", err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "☁️ Save to Cloud";
+  }
+}
+
+// Background auto-save (called after publish, non-blocking)
+function autoSaveToCloud(titleStr, slugStr) {
+  try {
+    var projectData = {
+      format: "stepwise-project",
+      version: "1.1",
+      title: titleStr,
+      subtitle: document.getElementById("docSubtitle").value || "",
+      brand: state.brand,
+      steps: state.steps,
+      savedAt: new Date().toISOString()
+    };
+
+    fetch(PUBLISH_API_URL + "/save-project", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + PUBLISH_SECRET
+      },
+      body: JSON.stringify({ slug: slugStr, title: titleStr, project: projectData })
+    }).then(function(res) { return res.json(); }).then(function(data) {
+      if (data.success) {
+        console.log("StepWise: Auto-saved project to cloud");
+        var statusDiv = document.getElementById("cloudSaveStatus");
+        if (statusDiv) { statusDiv.style.display = "block"; statusDiv.textContent = "☁️ Auto-saved " + new Date().toLocaleTimeString(); }
+      }
+    }).catch(function() {});
+  } catch (e) {}
+}
+
+async function loadFromCloudList() {
+  if (!(await ensureApiKey())) return;
+
+  var modal = document.getElementById("cloudModal");
+  var content = document.getElementById("cloudModalContent");
+  var title = document.getElementById("cloudModalTitle");
+  title.textContent = "☁️ Cloud Projects";
+  content.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px;">Loading...</div>';
+  modal.style.display = "flex";
+
+  try {
+    var response = await fetch(PUBLISH_API_URL + "/projects", {
+      headers: { "Authorization": "Bearer " + PUBLISH_SECRET }
+    });
+    var data = await response.json();
+
+    if (!data.success || !data.projects || data.projects.length === 0) {
+      content.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px;">No saved projects yet.<br><br>Projects are auto-saved when you publish a guide.</div>' +
+        '<div style="text-align:center;margin-top:16px;"><button class="btn btn-outline btn-sm" id="cloudImportGuideLink" style="width:auto;padding:8px 16px;">🌐 Import from Published Guide instead</button></div>';
+      var importLink = document.getElementById("cloudImportGuideLink");
+      if (importLink) importLink.addEventListener("click", function() { modal.style.display = "none"; importFromGuideList(); });
+      return;
+    }
+
+    var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    data.projects.forEach(function(p) {
+      var sizeStr = p.fileSize > 1048576 ? (p.fileSize / 1048576).toFixed(1) + " MB" : Math.round(p.fileSize / 1024) + " KB";
+      var dateStr = new Date(p.savedAt).toLocaleDateString() + " " + new Date(p.savedAt).toLocaleTimeString();
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;">' +
+        '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(p.title || p.slug) + '</div>' +
+        '<div style="font-size:10px;color:var(--text-3);margin-top:2px;">' + p.stepCount + ' steps · ' + sizeStr + ' · ' + dateStr +
+        (p.hasPublishedGuide ? ' · <span style="color:#22c55e;">Published</span>' : '') + '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-sm cloud-load-btn" data-slug="' + esc(p.slug) + '" style="width:auto;padding:6px 14px;margin-left:10px;flex-shrink:0;">Load</button>' +
+        '</div>';
+    });
+    html += '</div>';
+    html += '<div style="text-align:center;margin-top:16px;border-top:1px solid var(--border);padding-top:12px;"><button class="btn btn-outline btn-sm" id="cloudImportGuideLink" style="width:auto;padding:8px 16px;">🌐 Import from Published Guide instead</button></div>';
+
+    content.innerHTML = html;
+
+    // Bind load buttons
+    content.querySelectorAll(".cloud-load-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var s = btn.dataset.slug;
+        modal.style.display = "none";
+        loadFromCloud(s);
+      });
+    });
+
+    var importLink = document.getElementById("cloudImportGuideLink");
+    if (importLink) importLink.addEventListener("click", function() { modal.style.display = "none"; importFromGuideList(); });
+
+  } catch (err) {
+    content.innerHTML = '<div style="text-align:center;color:#ef4444;font-size:13px;padding:20px;">Failed to load projects: ' + esc(err.message) + '</div>';
+  }
+}
+
+async function loadFromCloud(projectSlug) {
+  showToast("Loading project...");
+
+  try {
+    var response = await fetch(PUBLISH_API_URL + "/project/" + projectSlug, {
+      headers: { "Authorization": "Bearer " + PUBLISH_SECRET }
+    });
+
+    if (!response.ok) {
+      var errData = await response.json().catch(function() { return {}; });
+      throw new Error(errData.error || "Failed to load project");
+    }
+
+    var data = await response.json();
+
+    if (!data.steps) throw new Error("Invalid project data");
+
+    resetProjectState();
+    state.steps = data.steps || [];
+    state.steps.forEach(function(s) { if (!s.annotations) s.annotations = []; });
+
+    if (data.title) document.getElementById("docTitle").value = data.title;
+    if (data.subtitle) document.getElementById("docSubtitle").value = data.subtitle;
+
+    if (data.brand) {
+      state.brand.name = data.brand.name || state.brand.name;
+      state.brand.primaryColor = data.brand.primaryColor || state.brand.primaryColor;
+      state.brand.accentColor = data.brand.accentColor || state.brand.accentColor;
+      if (data.brand.logo) state.brand.logo = data.brand.logo;
+      document.getElementById("brandName").value = state.brand.name || DEFAULT_BRAND_NAME;
+      document.getElementById("brandColor").value = data.brand.primaryColor || "#3b82f6";
+      document.getElementById("brandColorHex").value = data.brand.primaryColor || "#3b82f6";
+      document.getElementById("accentColor").value = data.brand.accentColor || "#8b5cf6";
+      document.getElementById("accentColorHex").value = data.brand.accentColor || "#8b5cf6";
+      if (data.brand.logo) {
+        document.getElementById("logoPreview").innerHTML = '<img src="' + data.brand.logo + '"><div class="upload-text">Click to change</div>';
+      }
+    }
+
+    // Set the slug so re-publishing updates the same guide
+    publishedSlug = projectSlug;
+
+    state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null;
+    lastKnownStepCount = state.steps.length;
+    showEditor(); render();
+    showToast("Loaded " + state.steps.length + " steps from cloud");
+
+  } catch (err) {
+    showToast("Load failed: " + err.message);
+    console.error("Cloud load error:", err);
+  }
+}
+
+async function importFromGuideList() {
+  if (!(await ensureApiKey())) return;
+
+  var modal = document.getElementById("cloudModal");
+  var content = document.getElementById("cloudModalContent");
+  var title = document.getElementById("cloudModalTitle");
+  title.textContent = "🌐 Import from Published Guide";
+  content.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px;">Loading published guides...</div>';
+  modal.style.display = "flex";
+
+  try {
+    var response = await fetch(PUBLISH_API_URL + "/list", {
+      headers: { "Authorization": "Bearer " + PUBLISH_SECRET }
+    });
+    var data = await response.json();
+
+    if (!data.success || !data.guides || data.guides.length === 0) {
+      content.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px;">No published guides found.</div>';
+      return;
+    }
+
+    var html = '<div style="margin-bottom:12px;padding:8px 12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;font-size:11px;color:#f59e0b;">Note: Annotations in imported guides are baked into the screenshots and cannot be edited separately. You can add new annotations on top.</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:8px;">';
+    data.guides.forEach(function(g) {
+      var dateStr = g.publishedAt ? new Date(g.publishedAt).toLocaleDateString() : "";
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;">' +
+        '<div style="flex:1;min-width:0;">' +
+        '<div style="font-size:13px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(g.title || g.slug) + '</div>' +
+        '<div style="font-size:10px;color:var(--text-3);margin-top:2px;">' + (g.stepCount || "?") + ' steps · ' + dateStr + '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-sm guide-import-btn" data-url="' + esc(g.url) + '" data-slug="' + esc(g.slug) + '" style="width:auto;padding:6px 14px;margin-left:10px;flex-shrink:0;">Import</button>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    content.innerHTML = html;
+
+    content.querySelectorAll(".guide-import-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var guideUrl = btn.dataset.url;
+        var guideSlug = btn.dataset.slug;
+        modal.style.display = "none";
+        importFromGuideUrl(guideUrl, guideSlug);
+      });
+    });
+
+  } catch (err) {
+    content.innerHTML = '<div style="text-align:center;color:#ef4444;font-size:13px;padding:20px;">Failed to load guides: ' + esc(err.message) + '</div>';
+  }
+}
+
+async function importFromGuideUrl(guideUrl, guideSlug) {
+  showToast("Importing guide...");
+
+  try {
+    var response = await fetch(guideUrl);
+    if (!response.ok) throw new Error("Failed to fetch guide (HTTP " + response.status + ")");
+    var htmlString = await response.text();
+
+    var project = importFromPublishedHTML(htmlString);
+    if (!project || !project.steps || project.steps.length === 0) {
+      showToast("Could not extract steps from this guide");
+      return;
+    }
+
+    resetProjectState();
+    state.steps = project.steps;
+    state.steps.forEach(function(s) { if (!s.annotations) s.annotations = []; });
+
+    if (project.title) document.getElementById("docTitle").value = project.title;
+    if (project.subtitle) document.getElementById("docSubtitle").value = project.subtitle;
+
+    if (project.brand && project.brand.primaryColor) {
+      state.brand.primaryColor = project.brand.primaryColor;
+      document.getElementById("brandColor").value = project.brand.primaryColor;
+      document.getElementById("brandColorHex").value = project.brand.primaryColor;
+    }
+
+    // Set slug so re-publishing updates the same guide
+    publishedSlug = guideSlug || null;
+
+    state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null;
+    lastKnownStepCount = state.steps.length;
+    showEditor(); render();
+    showToast("Imported " + state.steps.length + " steps from published guide");
+
+  } catch (err) {
+    showToast("Import failed: " + err.message);
+    console.error("Guide import error:", err);
+  }
+}
+
+function importFromPublishedHTML(htmlString) {
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(htmlString, "text/html");
+
+  // Extract title
+  var title = "";
+  var h1 = doc.querySelector("h1");
+  if (h1) title = h1.textContent.trim();
+
+  // Extract subtitle
+  var subtitle = "";
+  var sub = doc.querySelector(".subtitle");
+  if (sub) subtitle = sub.textContent.trim();
+
+  // Extract brand primary color from inline CSS
+  var primaryColor = "#3b82f6";
+  var styleEl = doc.querySelector("style");
+  if (styleEl) {
+    var cssText = styleEl.textContent;
+    var bgMatch = cssText.match(/\.step-num\{[^}]*background:([^;}\s]+)/);
+    if (!bgMatch) bgMatch = cssText.match(/\.step-num[^{]*\{[^}]*background:([^;}\s]+)/);
+    if (bgMatch) primaryColor = bgMatch[1].trim();
+  }
+
+  // Extract steps
+  var steps = [];
+  doc.querySelectorAll(".step").forEach(function(stepEl, index) {
+    var stepTitle = "";
+    var titleEl = stepEl.querySelector(".step-title");
+    if (titleEl) stepTitle = titleEl.textContent.trim();
+
+    var screenshot = "";
+    var imgEl = stepEl.querySelector(".step-screenshot");
+    if (imgEl) screenshot = imgEl.getAttribute("src") || "";
+
+    var description = "";
+    var descEl = stepEl.querySelector(".step-description");
+    if (descEl) description = descEl.textContent.trim();
+
+    var url = "";
+    var urlEl = stepEl.querySelector(".step-url");
+    if (urlEl) {
+      var a = urlEl.querySelector("a");
+      url = a ? a.getAttribute("href") : urlEl.textContent.trim();
+    }
+
+    steps.push({
+      id: "step_" + Date.now() + "_" + index,
+      number: index + 1,
+      title: stepTitle,
+      description: description,
+      screenshot: screenshot,
+      url: url,
+      pageTitle: "",
+      element: {},
+      coordinates: {},
+      annotations: [],
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  return {
+    format: "stepwise-project",
+    version: "1.1",
+    title: title,
+    subtitle: subtitle,
+    brand: {
+      name: "",
+      primaryColor: primaryColor,
+      accentColor: "#8b5cf6",
+      logo: ""
+    },
+    steps: steps
+  };
+}
+
 async function generateHTMLContent() {
   var title = document.getElementById("docTitle").value || "Documentation";
   var subtitle = document.getElementById("docSubtitle").value || "";
@@ -2701,6 +3077,9 @@ async function shareDoc() {
     btn.disabled = false;
     var isUpdate = publishBody.overwrite;
     showToast(isUpdate ? "Guide updated!" : "Published! Link is permanent.");
+
+    // Auto-save project to cloud in background (non-blocking)
+    autoSaveToCloud(title, publishedSlug);
 
     // Save to publish history (only on first publish, not updates)
     if (!isUpdate) {

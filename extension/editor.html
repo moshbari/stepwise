@@ -190,9 +190,13 @@
       <div class="import-area" id="importArea">
         <h2>Create Your Documentation</h2>
         <p>Start a new project, load an existing one, or import captured steps</p>
-        <div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;max-width:500px;margin-left:auto;margin-right:auto;">
+        <div style="display:flex;gap:12px;justify-content:center;margin-bottom:12px;max-width:500px;margin-left:auto;margin-right:auto;">
           <button class="btn btn-primary" style="flex:1" id="loadProjectBtnHome">📂 Load Project</button>
           <button class="btn btn-outline" style="flex:1" id="importJsonBtnHome">↑ Import JSON</button>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;max-width:500px;margin-left:auto;margin-right:auto;">
+          <button class="btn btn-outline" style="flex:1;display:none;" id="loadCloudBtnHome">☁️ Load from Cloud</button>
+          <button class="btn btn-outline" style="flex:1;display:none;" id="importGuideBtnHome">🌐 Import from Published Guide</button>
         </div>
         <div class="import-dropzone" id="dropZone">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.3;margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -218,6 +222,8 @@
         <button class="btn btn-primary" id="saveProjectBtn">💾 Save Project</button>
         <button class="btn btn-outline" id="saveQuickBtn" style="display:none;">💾 Quick Save (Ctrl+S)</button>
         <button class="btn btn-outline" id="loadProjectBtn">📂 Load Project</button>
+        <button class="btn btn-outline" id="saveCloudBtn" style="display:none;">☁️ Save to Cloud</button>
+        <div id="cloudSaveStatus" style="display:none;margin-top:4px;font-size:10px;color:var(--text-3);"></div>
         <div id="projectInfo" style="display:none;margin-top:8px;padding:8px 10px;background:var(--surface-2);border-radius:8px;font-size:11px;">
           <div style="color:var(--text-2);font-weight:600;" id="projectFileName">—</div>
           <div style="color:var(--text-3);font-size:9px;margin-top:2px;" id="projectSavedAt">—</div>
@@ -302,6 +308,17 @@
   <input type="file" id="jsonFileInput" accept=".json" style="display:none">
   <input type="file" id="logoFileInput" accept="image/*" style="display:none">
   <input type="file" id="screenshotFileInput" accept="image/*" style="display:none">
+  <div class="video-modal-overlay" id="cloudModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:3000;display:none;align-items:center;justify-content:center;">
+    <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 id="cloudModalTitle" style="font-size:16px;font-weight:700;color:var(--text-1);">☁️ Cloud Projects</h3>
+        <button class="btn btn-outline btn-sm" id="cloudModalClose" style="width:auto;padding:4px 12px;">✕</button>
+      </div>
+      <div id="cloudModalContent" style="min-height:80px;">
+        <div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px;">Loading...</div>
+      </div>
+    </div>
+  </div>
   <div class="video-modal-overlay" id="videoModal">
     <div class="video-modal">
       <h3 id="videoModalTitle">🎬 Generating Video...</h3>
