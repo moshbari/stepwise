@@ -1608,9 +1608,9 @@ var server = http.createServer(async function(req, res) {
       res.end(JSON.stringify({ success: false, error: "Invalid API key" }));
       return;
     }
-    if (!checkRateLimit(authResult.userId, "transcribe", 20)) {
+    if (!checkRateLimit(authResult.userId, "transcribe", 100)) {
       res.writeHead(429, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: false, error: "Rate limit exceeded. Max 20 transcriptions per hour." }));
+      res.end(JSON.stringify({ success: false, error: "Rate limit exceeded. Max 100 transcriptions per hour." }));
       return;
     }
     try {
