@@ -73,8 +73,19 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
         lastCaptureTime = now;
         captureStep(message.data, sender.tab, sendResponse);
         return true;
+      } else {
+        // Service worker may have just restarted — check storage before dropping the click
+        chrome.storage.local.get(["isRecording", "steps"], function(result) {
+          if (result.isRecording) {
+            isRecording = true;
+            if (result.steps) { steps = result.steps; stepCounter = result.steps.length; }
+            captureStep(message.data, sender.tab, sendResponse);
+          } else {
+            sendResponse({ success: false, error: "not recording" });
+          }
+        });
+        return true;
       }
-      break;
     case "GET_STEPS":
       sendResponse({ steps: steps });
       return true;

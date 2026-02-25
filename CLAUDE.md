@@ -276,6 +276,7 @@ When ANY file in `extension/` is changed:
 **This is not optional.** The downloads page is how users get the extension. If it's not updated, users won't get the new features.
 
 ### Current Versions
+- **v2.2.0** (Feb 25, 2026) — Fix click capture on GHL workflow pages (early script loading + service worker restart recovery)
 - **v2.1.0** (Feb 25, 2026) — Iframe support: captures clicks inside iframes (GoHighLevel workflows, embedded editors)
 - **v2.0.0** (Feb 18, 2026) — Save to Cloud (auto-saves on publish), Load from Cloud, Import from Published Guide
 - **v1.9.0** (Feb 18, 2026) — URLs in step descriptions and page URLs are now clickable links in published guides
