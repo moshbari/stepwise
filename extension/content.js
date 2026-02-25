@@ -13,6 +13,30 @@ window._stepwiseInjected = true;
 var isRecording = false;
 var feedbackTimeout = null;
 
+// --- Iframe Detection ---
+var isInIframe = false;
+try { isInIframe = (window !== window.top); } catch(e) { isInIframe = true; }
+
+// Calculate offset of this iframe relative to the top-level page
+function getFrameOffset() {
+  if (!isInIframe) return { x: 0, y: 0 };
+  var totalX = 0, totalY = 0;
+  var win = window;
+  try {
+    while (win !== win.top) {
+      var frame = win.frameElement;
+      if (!frame) break;
+      var rect = frame.getBoundingClientRect();
+      totalX += rect.left;
+      totalY += rect.top;
+      win = win.parent;
+    }
+  } catch(e) {
+    // Cross-origin boundary — use accumulated offset so far
+  }
+  return { x: totalX, y: totalY };
+}
+
 // --- Voice Recording ---
 var voiceEnabled = false;
 var mediaRecorder = null;
@@ -163,6 +187,21 @@ document.addEventListener("click", function(e) {
   // Draw highlight circle at click position BEFORE screenshot
   var highlight = drawClickHighlight(e.clientX, e.clientY);
 
+  // Adjust coordinates for iframe offset
+  var frameOffset = getFrameOffset();
+  var topScrollX = window.scrollX;
+  var topScrollY = window.scrollY;
+  var topViewportWidth = window.innerWidth;
+  var topViewportHeight = window.innerHeight;
+  if (isInIframe) {
+    try {
+      topScrollX = window.top.scrollX;
+      topScrollY = window.top.scrollY;
+      topViewportWidth = window.top.innerWidth;
+      topViewportHeight = window.top.innerHeight;
+    } catch(e) {}
+  }
+
   var clickData = {
     tag: interactiveElement.tagName,
     text: getVisibleText(interactiveElement),
@@ -175,21 +214,21 @@ document.addEventListener("click", function(e) {
     role: interactiveElement.getAttribute("role") || element.getAttribute("role") || null,
     name: interactiveElement.name || null,
     xpath: getXPath(interactiveElement),
-    x: e.pageX,
-    y: e.pageY,
-    viewportX: e.clientX,
-    viewportY: e.clientY,
-    scrollX: window.scrollX,
-    scrollY: window.scrollY,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight
+    x: e.clientX + frameOffset.x + topScrollX,
+    y: e.clientY + frameOffset.y + topScrollY,
+    viewportX: e.clientX + frameOffset.x,
+    viewportY: e.clientY + frameOffset.y,
+    scrollX: topScrollX,
+    scrollY: topScrollY,
+    viewportWidth: topViewportWidth,
+    viewportHeight: topViewportHeight
   };
 
   // Capture voice audio chunk BEFORE this click's step is created
   // This audio is what the user said AFTER the previous click = caption for PREVIOUS step
   var prevStepId = lastStepId;
   console.log("StepWise Voice: Click detected. prevStepId:", prevStepId, "voiceEnabled:", voiceEnabled, "hasRecorder:", !!mediaRecorder);
-  var voicePromise = (voiceEnabled && mediaRecorder) ? captureVoiceChunk() : Promise.resolve(null);
+  var voicePromise = (!isInIframe && voiceEnabled && mediaRecorder) ? captureVoiceChunk() : Promise.resolve(null);
 
   // Small delay to let the highlight render, then capture
   setTimeout(function() {
@@ -389,17 +428,19 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       isRecording = true;
       lastStepId = null;
       showRecordingIndicator();
-      // Check if voice is enabled and start mic
-      chrome.storage.local.get(["voiceEnabled"], function(result) {
-        voiceEnabled = result.voiceEnabled !== undefined ? result.voiceEnabled : true;
-        console.log("StepWise Voice: Recording started. voiceEnabled from storage:", voiceEnabled);
-        if (voiceEnabled) startVoiceRecording();
-      });
+      // Check if voice is enabled and start mic (main frame only)
+      if (!isInIframe) {
+        chrome.storage.local.get(["voiceEnabled"], function(result) {
+          voiceEnabled = result.voiceEnabled !== undefined ? result.voiceEnabled : true;
+          console.log("StepWise Voice: Recording started. voiceEnabled from storage:", voiceEnabled);
+          if (voiceEnabled) startVoiceRecording();
+        });
+      }
       break;
     case "RECORDING_STOPPED":
       isRecording = false;
-      // Capture final voice chunk for the last step
-      if (voiceEnabled && mediaRecorder && lastStepId) {
+      // Capture final voice chunk for the last step (main frame only)
+      if (!isInIframe && voiceEnabled && mediaRecorder && lastStepId) {
         console.log("StepWise Voice: Capturing final chunk for step:", lastStepId);
         var finalStepId = lastStepId;
         captureVoiceChunk().then(function(audioBase64) {
@@ -423,16 +464,18 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
         });
       } else {
         lastStepId = null;
-        if (voiceEnabled) stopVoiceRecording();
+        if (!isInIframe && voiceEnabled) stopVoiceRecording();
       }
       hideRecordingIndicator();
       break;
     case "VOICE_STATE_CHANGED":
-      voiceEnabled = message.enabled;
-      if (isRecording && voiceEnabled) {
-        startVoiceRecording();
-      } else if (!voiceEnabled) {
-        stopVoiceRecording();
+      if (!isInIframe) {
+        voiceEnabled = message.enabled;
+        if (isRecording && voiceEnabled) {
+          startVoiceRecording();
+        } else if (!voiceEnabled) {
+          stopVoiceRecording();
+        }
       }
       break;
     case "STEP_CAPTURED":
@@ -447,6 +490,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 // --- UI: Recording Indicator ---
 
 function showRecordingIndicator() {
+  if (isInIframe) return;
   removeExisting("stepwise-recording-indicator");
   var indicator = document.createElement("div");
   indicator.id = "stepwise-recording-indicator";
@@ -467,6 +511,7 @@ function hideRecordingIndicator() {
 // --- UI: Capture Feedback ---
 
 function showCaptureFeedback(stepNumber) {
+  if (isInIframe) return;
   removeExisting("stepwise-capture-feedback");
   if (feedbackTimeout) clearTimeout(feedbackTimeout);
 
