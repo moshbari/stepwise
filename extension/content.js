@@ -17,6 +17,8 @@ var feedbackTimeout = null;
 var isInIframe = false;
 try { isInIframe = (window !== window.top); } catch(e) { isInIframe = true; }
 
+console.log("StepWise: Content script loaded in", window.location.href, isInIframe ? "(iframe)" : "(main frame)");
+
 // Calculate offset of this iframe relative to the top-level page
 function getFrameOffset() {
   if (!isInIframe) return { x: 0, y: 0 };
@@ -175,9 +177,10 @@ function updateVoiceIndicator(active) {
 
 // --- Click Listener ---
 
-document.addEventListener("click", function(e) {
+window.addEventListener("click", function(e) {
   if (!isRecording) return;
-  if (e.target.closest(".stepwise-overlay")) return;
+  if (e.target.closest && e.target.closest(".stepwise-overlay")) return;
+  console.log("StepWise: Click captured at", e.clientX, e.clientY, "on", e.target.tagName, isInIframe ? "(in iframe)" : "");
 
   var element = e.target;
 
@@ -279,6 +282,7 @@ document.addEventListener("click", function(e) {
 // --- Draw Click Highlight ---
 
 function drawClickHighlight(x, y) {
+  if (!document.body) return null;
   var container = document.createElement("div");
   container.className = "stepwise-overlay stepwise-click-highlight";
   container.style.cssText = "position:fixed;z-index:2147483646;pointer-events:none;" +
@@ -491,17 +495,21 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 
 function showRecordingIndicator() {
   if (isInIframe) return;
-  removeExisting("stepwise-recording-indicator");
-  var indicator = document.createElement("div");
-  indicator.id = "stepwise-recording-indicator";
-  indicator.className = "stepwise-overlay";
-  var dot = document.createElement("div");
-  dot.className = "stepwise-rec-dot";
-  indicator.appendChild(dot);
-  var span = document.createElement("span");
-  span.textContent = "StepWise Recording";
-  indicator.appendChild(span);
-  document.body.appendChild(indicator);
+  function doShow() {
+    removeExisting("stepwise-recording-indicator");
+    var indicator = document.createElement("div");
+    indicator.id = "stepwise-recording-indicator";
+    indicator.className = "stepwise-overlay";
+    var dot = document.createElement("div");
+    dot.className = "stepwise-rec-dot";
+    indicator.appendChild(dot);
+    var span = document.createElement("span");
+    span.textContent = "StepWise Recording";
+    indicator.appendChild(span);
+    document.body.appendChild(indicator);
+  }
+  if (document.body) { doShow(); }
+  else { document.addEventListener("DOMContentLoaded", doShow); }
 }
 
 function hideRecordingIndicator() {
@@ -512,6 +520,7 @@ function hideRecordingIndicator() {
 
 function showCaptureFeedback(stepNumber) {
   if (isInIframe) return;
+  if (!document.body) return;
   removeExisting("stepwise-capture-feedback");
   if (feedbackTimeout) clearTimeout(feedbackTimeout);
 
