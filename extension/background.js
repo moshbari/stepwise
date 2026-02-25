@@ -349,11 +349,11 @@ async function injectIntoAllTabs() {
         // Script not injected yet — inject it
         try {
           await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             files: ["content.js"]
           });
           await chrome.scripting.insertCSS({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             files: ["content.css"]
           });
         } catch (injectErr) {
@@ -454,11 +454,11 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
 
   // Inject and notify
   chrome.scripting.executeScript({
-    target: { tabId: tabId },
+    target: { tabId: tabId, allFrames: true },
     files: ["content.js"]
   }).then(function() {
     return chrome.scripting.insertCSS({
-      target: { tabId: tabId },
+      target: { tabId: tabId, allFrames: true },
       files: ["content.css"]
     });
   }).then(function() {

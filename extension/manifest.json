@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "StepWise - Auto Documentation Capture",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Auto-capture step-by-step screenshots and workflow docs. Record, edit, and export as PDF or HTML.",
   "permissions": [
     "activeTab",
@@ -29,7 +29,8 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "css": ["content.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "icons": {
