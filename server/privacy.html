@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StepWise - Privacy Policy</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #cbd5e1; min-height: 100vh; line-height: 1.7; }
+.header { background: linear-gradient(135deg, #1e293b, #0f172a); border-bottom: 1px solid #334155; padding: 40px 20px; text-align: center; }
+.header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; color: #f1f5f9; }
+.header h1 em { background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-style: normal; }
+.header p { color: #94a3b8; font-size: 14px; }
+.container { max-width: 720px; margin: 0 auto; padding: 40px 20px 60px; }
+h2 { font-size: 20px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; }
+h3 { font-size: 16px; font-weight: 600; color: #e2e8f0; margin: 20px 0 8px; }
+p { margin-bottom: 12px; font-size: 15px; }
+ul { margin: 8px 0 16px 24px; }
+li { margin-bottom: 6px; font-size: 15px; }
+strong { color: #e2e8f0; }
+a { color: #f59e0b; }
+.updated { font-size: 13px; color: #64748b; margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><em>StepWise</em> Privacy Policy</h1>
+  <p>How we handle your data</p>
+</div>
+
+<div class="container">
+
+<h2>Overview</h2>
+<p>StepWise is a Chrome extension that captures step-by-step screenshots and workflow documentation. We are committed to protecting your privacy. This policy explains what data we collect, how it's used, and how it's stored.</p>
+
+<h2>Data We Collect</h2>
+
+<h3>Screenshots &amp; Click Data</h3>
+<p>When you start a recording session, StepWise captures:</p>
+<ul>
+  <li>Screenshots of the visible browser tab</li>
+  <li>Click positions, element metadata (tag name, text content, CSS selectors)</li>
+  <li>Page URL and title of the active tab</li>
+</ul>
+<p><strong>This data is captured only while you are actively recording</strong> (after clicking "Start Recording") and is stored locally on your device. StepWise never captures data in the background.</p>
+
+<h3>Voice Recordings (Optional)</h3>
+<p>If you enable voice narration, StepWise requests microphone access to record your voice descriptions. Audio is:</p>
+<ul>
+  <li>Sent directly to OpenAI's Whisper API for transcription</li>
+  <li>Never stored on our servers</li>
+  <li>Processed only when you explicitly enable voice narration</li>
+</ul>
+
+<h3>API Keys</h3>
+<p>StepWise stores two optional API keys locally on your device:</p>
+<ul>
+  <li><strong>OpenAI API Key</strong> — Your own key, encrypted locally using XOR cipher and stored in Chrome's local storage. Sent only to OpenAI's official API endpoints for transcription and text-to-speech features.</li>
+  <li><strong>StepWise Publishing Key</strong> — Provided by your administrator. Sent to our publishing server to authenticate guide publishing, video saving, and account features.</li>
+</ul>
+
+<h2>How Data Is Used</h2>
+<ul>
+  <li><strong>Screenshots &amp; steps</strong> — Used to generate your documentation. Stored locally until you export or publish.</li>
+  <li><strong>Published guides</strong> — When you click "Publish", your guide HTML is sent to our server and hosted at a permanent URL you control.</li>
+  <li><strong>Video generation</strong> — Step data may be sent to our video generation service to create MP4 walkthroughs. Videos are stored on secure cloud storage.</li>
+  <li><strong>Brand settings</strong> — Company name, logo, and colors are stored locally and included in exported guides.</li>
+</ul>
+
+<h2>Data Storage</h2>
+<ul>
+  <li><strong>Local storage</strong> — All step data, screenshots, settings, and API keys are stored in Chrome's local storage on your device only.</li>
+  <li><strong>Server storage</strong> — Published guides and saved video links are stored on our server at app.heychatmate.com.</li>
+  <li><strong>No third-party analytics</strong> — We do not use Google Analytics, tracking pixels, or any third-party analytics services.</li>
+</ul>
+
+<h2>Third-Party Services</h2>
+<p>StepWise integrates with the following third-party services only when you explicitly use those features:</p>
+<ul>
+  <li><strong>OpenAI API</strong> (api.openai.com) — For voice transcription (Whisper) and text-to-speech. Uses your own API key. Subject to <a href="https://openai.com/policies/privacy-policy" target="_blank">OpenAI's Privacy Policy</a>.</li>
+</ul>
+
+<h2>Permissions Explained</h2>
+<ul>
+  <li><strong>activeTab</strong> — Capture screenshots of the current tab during recording.</li>
+  <li><strong>tabs</strong> — Access tab information to inject the recording script and capture page URLs.</li>
+  <li><strong>storage / unlimitedStorage</strong> — Store step data, screenshots, and settings locally.</li>
+  <li><strong>scripting</strong> — Inject the click-capture script into pages during recording.</li>
+  <li><strong>Host permissions (all URLs)</strong> — Required because workflow recording must work on any website you visit.</li>
+</ul>
+
+<h2>Data Sharing</h2>
+<p>We do <strong>not</strong> sell, share, or transfer your data to any third parties. Your data is only sent to:</p>
+<ul>
+  <li>Our publishing server (when you click Publish)</li>
+  <li>OpenAI's API (when you use voice or AI features, using your own API key)</li>
+</ul>
+
+<h2>Data Deletion</h2>
+<p>You can delete all locally stored data at any time by:</p>
+<ul>
+  <li>Clicking "Clear" in the extension popup to remove recorded steps</li>
+  <li>Using "Log Out" to remove your API keys and account data</li>
+  <li>Uninstalling the extension (removes all local data)</li>
+</ul>
+<p>To delete published guides, use the "Manage" button on your guides index page.</p>
+
+<h2>Contact</h2>
+<p>For privacy questions or data deletion requests, contact us at: <strong>engrmoshbari@gmail.com</strong></p>
+
+<p class="updated">Last updated: February 14, 2026</p>
+
+</div>
+</body>
+</html>

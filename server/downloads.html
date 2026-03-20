@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StepWise — Extension Downloads</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 40px 20px; }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { color: #f59e0b; font-size: 28px; margin-bottom: 8px; }
+  .subtitle { color: #64748b; margin-bottom: 40px; font-size: 14px; }
+  .version-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .version-card.latest { border-color: #f59e0b; }
+  .version-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .version-name { font-size: 20px; font-weight: 700; color: #f1f5f9; }
+  .version-date { color: #64748b; font-size: 13px; }
+  .badge { display: inline-block; background: #f59e0b; color: #0f172a; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+  .changes { margin-bottom: 16px; }
+  .changes h4 { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .changes ul { list-style: none; padding: 0; }
+  .changes li { color: #cbd5e1; font-size: 14px; padding: 4px 0; padding-left: 20px; position: relative; line-height: 1.5; }
+  .changes li::before { content: ""; position: absolute; left: 0; top: 11px; width: 8px; height: 8px; border-radius: 50%; }
+  .changes.new li::before { background: #22c55e; }
+  .changes.changed li::before { background: #3b82f6; }
+  .changes.fixed li::before { background: #f59e0b; }
+  .download-btn { display: inline-flex; align-items: center; gap: 8px; background: #f59e0b; color: #0f172a; text-decoration: none; font-weight: 600; font-size: 14px; padding: 10px 20px; border-radius: 8px; transition: background 0.2s; }
+  .download-btn:hover { background: #d97706; }
+  .download-btn svg { width: 16px; height: 16px; }
+  .file-size { color: #64748b; font-size: 12px; margin-left: 8px; }
+  .install-note { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 30px; }
+  .install-note h3 { color: #f59e0b; font-size: 16px; margin-bottom: 12px; }
+  .install-note ol { padding-left: 20px; color: #94a3b8; font-size: 14px; line-height: 1.8; }
+  .install-note code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #f59e0b; }
+  footer { text-align: center; color: #475569; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #1e293b; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>StepWise Extension Downloads</h1>
+  <p class="subtitle">All versions of the StepWise Chrome extension. Download, unzip, and load in Chrome.</p>
+
+  <div class="install-note">
+    <h3>How to Install</h3>
+    <ol>
+      <li>Download the zip file below</li>
+      <li>Unzip it to a folder on your computer</li>
+      <li>Open Chrome and go to <code>chrome://extensions</code></li>
+      <li>Enable <strong>Developer mode</strong> (top right toggle)</li>
+      <li>Click <strong>Load unpacked</strong> and select the unzipped folder</li>
+    </ol>
+  </div>
+
+  <!-- VERSIONS — newest first -->
+
+  <div class="version-card latest">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v2.4.4</span>
+        <span class="badge">LATEST</span>
+      </div>
+      <span class="version-date">Mar 20, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Callout tool redesigned — click to place arrow tip first, then drag to create text box. Move box and arrow tip independently</li>
+        <li>Step numbers now have arrows pointing to targets — same click-to-place flow as callouts</li>
+        <li>In-place move and resize for all annotation tools without switching to the select tool</li>
+        <li>Smart step numbering — no more gaps after deletion (uses max+1 counter)</li>
+        <li>Auto Re-number button to resequence all step numbers</li>
+        <li>Editable step labels — double-click or use Edit Label button to change (e.g. "3A", "3B")</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v2.4.4.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v2.4.4
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v2.4.3</span>
+      </div>
+      <span class="version-date">Mar 20, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Major annotation UX overhaul — callout and step number tools redesigned with arrow-first creation flow</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v2.4.3.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v2.4.3
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v2.2.0</span>
+      </div>
+      <span class="version-date">Feb 25, 2026</span>
+    </div>
+    <div class="changes fixed">
+      <h4>Fixed</h4>
+      <ul>
+        <li>Fix click capture on GoHighLevel workflow pages — content script now loads before page scripts to prevent event interception</li>
+        <li>Fix service worker restart dropping clicks — background now recovers recording state from storage</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v2.2.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v2.2.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v2.1.0</span>
+      </div>
+      <span class="version-date">Feb 25, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Iframe support — StepWise now captures clicks inside iframes (e.g. GoHighLevel workflows, embedded editors)</li>
+        <li>Click coordinates are automatically adjusted to match the full-page screenshot</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v2.1.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v2.1.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v2.0.0</span>
+      </div>
+      <span class="version-date">Feb 18, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Save to Cloud — projects auto-save when you publish, so you can re-edit guides anytime</li>
+        <li>Load from Cloud — reload any saved project back into the editor</li>
+        <li>Import from Published Guide — reconstruct a project from any published guide (for older guides without cloud saves)</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v2.0.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v2.0.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.9.0</span>
+      </div>
+      <span class="version-date">Feb 18, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>URLs in step descriptions and page URLs are now clickable links in published guides, exported HTML, and PDF</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.9.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.9.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.8.0</span>
+      </div>
+      <span class="version-date">Feb 18, 2026</span>
+    </div>
+    <div class="changes changed">
+      <h4>Changed</h4>
+      <ul>
+        <li>Voice auto-dictation is now ON by default — step descriptions fill automatically from your voice without needing to enable it first</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.8.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.8.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.7.0</span>
+      </div>
+      <span class="version-date">Feb 17, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Guide/video dates now show Dubai time (hh:mm:ss) so you can tell versions apart</li>
+        <li>Guide and video links always open in a new tab</li>
+      </ul>
+    </div>
+    <div class="changes changed">
+      <h4>Changed</h4>
+      <ul>
+        <li>"Upgrade to Pro" button is hidden when user already has an API key</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.7.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.7.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.6.0</span>
+      </div>
+      <span class="version-date">Feb 17, 2026</span>
+    </div>
+    <div class="changes fixed">
+      <h4>Fixed</h4>
+      <ul>
+        <li>Loading a new project no longer overwrites previously published guides — publish state is fully reset on project load</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.6.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.6.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.5.0</span>
+      </div>
+      <span class="version-date">Feb 17, 2026</span>
+    </div>
+    <div class="changes fixed">
+      <h4>Fixed</h4>
+      <ul>
+        <li>Video generation no longer requires a separate OpenAI API key — uses the server-provided key automatically</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.5.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.5.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.4.0</span>
+      </div>
+      <span class="version-date">Feb 17, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>Add Video to Guide button — embed your generated video at the top of the published guide with full player controls</li>
+      </ul>
+    </div>
+    <div class="changes fixed">
+      <h4>Fixed</h4>
+      <ul>
+        <li>Publish now updates the same guide instead of creating duplicates — no more -2, -3 suffixed copies</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.4.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.4.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.3.0</span>
+      </div>
+      <span class="version-date">Feb 16, 2026</span>
+    </div>
+    <div class="changes new">
+      <h4>New</h4>
+      <ul>
+        <li>API key login in popup — paste your key and log in without opening the editor</li>
+        <li>Logged-in account card shows your name, My Guides link, and Log Out</li>
+      </ul>
+    </div>
+    <div class="changes changed">
+      <h4>Changed</h4>
+      <ul>
+        <li>My Guides and Log Out moved from footer to account section at top of popup</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.3.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.3.0
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v1.2.0</span>
+      </div>
+      <span class="version-date">Feb 16, 2026</span>
+    </div>
+    <div class="changes changed">
+      <h4>Changed</h4>
+      <ul>
+        <li>Upgrade to Pro link now points to WarriorPlus sales page</li>
+      </ul>
+    </div>
+    <div class="changes fixed">
+      <h4>Fixed</h4>
+      <ul>
+        <li>WarriorPlus webhook now works with new multipart WP_ format</li>
+        <li>Welcome emails sent via GoHighLevel instead of Brevo SMTP</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v1.2.0.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v1.2.0
+    </a>
+  </div>
+
+  <footer>&copy; 2026 StepWise. All rights reserved.</footer>
+</div>
+</body>
+</html>

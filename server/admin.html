@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StepWise Admin</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+/* Header */
+.header { background: linear-gradient(135deg, #1e293b, #0f172a); border-bottom: 1px solid #334155; padding: 30px 20px; text-align: center; }
+.header h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+.header h1 em { background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-style: normal; }
+.header p { color: #94a3b8; font-size: 13px; }
+
+/* Container */
+.container { max-width: 960px; margin: 0 auto; padding: 30px 20px; }
+
+/* Login Screen */
+.login-box { max-width: 400px; margin: 80px auto; background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 40px; text-align: center; }
+.login-box h2 { font-size: 20px; margin-bottom: 8px; }
+.login-box p { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+.login-box input { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; margin-bottom: 16px; outline: none; }
+.login-box input:focus { border-color: #f59e0b; }
+.login-box .error { color: #ef4444; font-size: 12px; margin-bottom: 12px; display: none; }
+
+/* Buttons */
+.btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-primary { background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+.btn-danger { background: #1e293b; border: 1px solid #ef4444; color: #ef4444; padding: 6px 14px; font-size: 12px; }
+.btn-danger:hover { background: #ef4444; color: #fff; }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Stats Bar */
+.stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; text-align: center; }
+.stat-card .stat-value { font-size: 28px; font-weight: 700; color: #f59e0b; }
+.stat-card .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 4px; }
+.tab-btn { flex: 1; padding: 10px 16px; background: transparent; border: none; border-radius: 8px; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.tab-btn.active { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.tab-btn:hover:not(.active) { color: #e2e8f0; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Sections */
+.section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+.section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.section-title span { font-size: 18px; }
+
+/* Add Customer Form */
+.form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.form-row input { flex: 1; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 13px; outline: none; }
+.form-row input:focus { border-color: #f59e0b; }
+
+/* API Key Result */
+.key-result { display: none; background: #0f172a; border: 1px solid #22c55e; border-radius: 8px; padding: 16px; margin-top: 16px; }
+.key-result .label { font-size: 11px; color: #22c55e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.key-result .key-row { display: flex; gap: 8px; align-items: center; }
+.key-result input { flex: 1; padding: 10px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #f59e0b; font-size: 13px; font-family: monospace; outline: none; }
+.key-result .info { font-size: 11px; color: #94a3b8; margin-top: 10px; }
+.key-result .info a { color: #f59e0b; }
+
+/* User Table */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border-bottom: 1px solid #334155; }
+td { padding: 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+tr:hover td { background: rgba(245,158,11,0.03); }
+.user-name { font-weight: 600; color: #f1f5f9; }
+.user-email { color: #94a3b8; font-size: 12px; }
+.user-id { font-family: monospace; font-size: 11px; color: #64748b; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+.badge-active { background: rgba(34,197,94,0.15); color: #22c55e; }
+.badge-inactive { background: rgba(239,68,68,0.15); color: #ef4444; }
+.badge-source { background: rgba(99,102,241,0.15); color: #818cf8; }
+.badge-whop { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.badge-warriorplus { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.badge-jvzoo { background: rgba(168,85,247,0.15); color: #c084fc; }
+.badge-manual { background: rgba(100,116,139,0.15); color: #94a3b8; }
+.guide-count { font-weight: 600; color: #f59e0b; }
+.guide-link { color: #94a3b8; text-decoration: none; font-size: 12px; }
+.guide-link:hover { color: #f59e0b; }
+.date { color: #64748b; font-size: 12px; }
+.empty-state { text-align: center; padding: 40px; color: #475569; }
+
+/* Logout */
+.top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.top-bar .count { font-size: 13px; color: #64748b; }
+.logout-btn { background: none; border: 1px solid #334155; color: #94a3b8; padding: 6px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+.logout-btn:hover { border-color: #ef4444; color: #ef4444; }
+
+/* Toast */
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 12px 24px; border-radius: 10px; font-size: 13px; display: none; z-index: 999; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+
+/* Search & Filter */
+.search-bar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+.search-bar input { flex: 1; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 13px; outline: none; }
+.search-bar input:focus { border-color: #f59e0b; }
+.search-bar input::placeholder { color: #475569; }
+.filter-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.filter-btn { padding: 6px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #94a3b8; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.filter-btn:hover { border-color: #64748b; color: #e2e8f0; }
+.filter-btn.active { background: rgba(245,158,11,0.1); border-color: #f59e0b; color: #f59e0b; }
+.search-count { font-size: 11px; color: #64748b; margin-bottom: 12px; }
+
+/* Webhook Logs Table */
+.log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.log-table th { text-align: left; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; border-bottom: 1px solid #334155; }
+.log-table td { padding: 10px; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 12px; }
+.log-table tr:hover td { background: rgba(245,158,11,0.03); }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; }
+  .search-bar { flex-direction: column; }
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  table { font-size: 12px; }
+  th, td { padding: 8px 6px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><em>StepWise</em> Admin</h1>
+  <p>Manage your SaaS platform</p>
+</div>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <p>Enter your admin secret key to continue</p>
+    <input type="password" id="secretInput" placeholder="Paste your admin secret key..." onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="error" id="loginError">Invalid key. Please try again.</div>
+    <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">Sign In</button>
+  </div>
+</div>
+
+<!-- Dashboard (hidden until login) -->
+<div id="dashboard" style="display:none;">
+  <div class="container">
+    <div class="top-bar">
+      <div class="count" id="userCount"></div>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label">Total Users</div></div>
+      <div class="stat-card"><div class="stat-value" id="statActive">-</div><div class="stat-label">Active</div></div>
+      <div class="stat-card"><div class="stat-value" id="statGuides">-</div><div class="stat-label">Guides</div></div>
+      <div class="stat-card"><div class="stat-value" id="statVideos">-</div><div class="stat-label">Videos</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('customers', this)">Customers</button>
+      <button class="tab-btn" onclick="switchTab('webhooks', this)">Webhook Logs</button>
+      <button class="tab-btn" onclick="switchTab('test', this)">Test Webhook</button>
+    </div>
+
+    <!-- Tab: Customers -->
+    <div id="tab-customers" class="tab-content active">
+      <!-- Add Customer -->
+      <div class="section">
+        <div class="section-title"><span>&#x2795;</span> Add New Customer</div>
+        <div class="form-row">
+          <input type="text" id="newName" placeholder="Customer name (required)">
+          <input type="email" id="newEmail" placeholder="Email (optional)">
+          <button class="btn btn-primary btn-sm" id="addBtn" onclick="addCustomer()">Create</button>
+        </div>
+        <div class="key-result" id="keyResult">
+          <div class="label">Customer created! Copy the message below and send it to them:</div>
+          <textarea id="onboardingMsg" readonly rows="9" style="width:100%;padding:12px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;font-family:inherit;line-height:1.5;resize:vertical;margin-bottom:8px;outline:none;"></textarea>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="copyOnboarding()">Copy Message</button>
+            <button class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;" onclick="copyKeyOnly()">Copy API Key Only</button>
+            <a id="newIndexLink" href="#" target="_blank" class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;text-decoration:none;">Open Guides Page</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- User List -->
+      <div class="section">
+        <div class="section-title"><span>&#x1F465;</span> Customers</div>
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="Search by name, email, ID, or source...">
+          <div class="filter-btns">
+            <button class="filter-btn active" data-filter="all" onclick="setFilter(this)">All</button>
+            <button class="filter-btn" data-filter="active" onclick="setFilter(this)">Active</button>
+            <button class="filter-btn" data-filter="inactive" onclick="setFilter(this)">Inactive</button>
+          </div>
+        </div>
+        <div class="search-count" id="searchCount"></div>
+        <div id="userList"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Webhook Logs -->
+    <div id="tab-webhooks" class="tab-content">
+      <div class="section">
+        <div class="section-title"><span>&#x1F4CB;</span> Recent Webhook Events</div>
+        <div id="webhookLogs"><div class="empty-state"><p>Loading...</p></div></div>
+      </div>
+    </div>
+
+    <!-- Tab: Test Webhook -->
+    <div id="tab-test" class="tab-content">
+      <div class="section">
+        <div class="section-title"><span>&#x1F9EA;</span> Simulate Payment Webhook</div>
+        <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">Test the account creation flow as if a payment webhook was received. This creates a real account and sends a welcome email.</p>
+        <div class="form-row">
+          <input type="email" id="testEmail" placeholder="Customer email (required)">
+          <input type="text" id="testName" placeholder="Customer name (optional)">
+          <select id="testSource" style="padding:10px 14px;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:13px;outline:none;">
+            <option value="whop">Whop</option>
+            <option value="warriorplus">WarriorPlus</option>
+            <option value="jvzoo">JVZoo</option>
+            <option value="test">Test</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="testBtn" onclick="testWebhook()">Simulate</button>
+        </div>
+        <div id="testResult" style="display:none;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px;margin-top:16px;">
+          <pre id="testResultText" style="font-size:12px;color:#e2e8f0;white-space:pre-wrap;font-family:monospace;"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API = "https://app.heychatmate.com/stepwise-api";
+var adminKey = "";
+var allUsers = [];
+
+function showToast(msg) {
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  setTimeout(function() { t.style.display = "none"; }, 3000);
+}
+
+// === TABS ===
+function switchTab(tabName, btn) {
+  document.querySelectorAll(".tab-content").forEach(function(el) { el.classList.remove("active"); });
+  document.querySelectorAll(".tab-btn").forEach(function(el) { el.classList.remove("active"); });
+  document.getElementById("tab-" + tabName).classList.add("active");
+  btn.classList.add("active");
+
+  if (tabName === "webhooks") loadWebhookLogs();
+}
+
+// === LOGIN ===
+async function doLogin() {
+  var key = document.getElementById("secretInput").value.trim();
+  if (!key) return;
+
+  var btn = document.getElementById("loginBtn");
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  document.getElementById("loginError").style.display = "none";
+
+  try {
+    var res = await fetch(API + "/admin/users", {
+      headers: { "Authorization": "Bearer " + key }
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      adminKey = key;
+      sessionStorage.setItem("sw_admin", key);
+      document.getElementById("loginScreen").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      renderUsers(data.users);
+      loadStats();
+    } else {
+      document.getElementById("loginError").style.display = "block";
+    }
+  } catch(e) {
+    document.getElementById("loginError").textContent = "Could not connect to server.";
+    document.getElementById("loginError").style.display = "block";
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Sign In";
+}
+
+function doLogout() {
+  adminKey = "";
+  sessionStorage.removeItem("sw_admin");
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("loginScreen").style.display = "block";
+  document.getElementById("secretInput").value = "";
+  document.getElementById("keyResult").style.display = "none";
+}
+
+// === AUTO LOGIN ===
+(function() {
+  var saved = sessionStorage.getItem("sw_admin");
+  if (saved) {
+    document.getElementById("secretInput").value = saved;
+    doLogin();
+  }
+})();
+
+// === STATS ===
+async function loadStats() {
+  try {
+    var res = await fetch(API + "/admin/stats", {
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+    if (data.success) {
+      document.getElementById("statTotal").textContent = data.stats.totalUsers;
+      document.getElementById("statActive").textContent = data.stats.activeUsers;
+      document.getElementById("statGuides").textContent = data.stats.totalGuides;
+      document.getElementById("statVideos").textContent = data.stats.totalVideos;
+    }
+  } catch(e) {}
+}
+
+// === SEARCH ===
+document.getElementById("searchInput").addEventListener("input", filterUsers);
+
+// === RENDER USERS ===
+function renderUsers(users) {
+  users.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+  allUsers = users;
+
+  var active = users.filter(function(u) { return u.active; }).length;
+  document.getElementById("userCount").textContent = users.length + " customer" + (users.length === 1 ? "" : "s") + " (" + active + " active)";
+
+  filterUsers();
+}
+
+function filterUsers() {
+  var query = document.getElementById("searchInput").value.toLowerCase().trim();
+  var activeBtn = document.querySelector(".filter-btn.active");
+  var statusFilter = activeBtn ? activeBtn.dataset.filter : "all";
+
+  var filtered = allUsers.filter(function(u) {
+    if (statusFilter === "active" && !u.active) return false;
+    if (statusFilter === "inactive" && u.active) return false;
+    if (query) {
+      var searchable = (u.name + " " + (u.email || "") + " " + u.userId + " " + (u.apiKey || "") + " " + (u.paymentSource || "")).toLowerCase();
+      return searchable.indexOf(query) >= 0;
+    }
+    return true;
+  });
+
+  var countEl = document.getElementById("searchCount");
+  if (query || statusFilter !== "all") {
+    countEl.textContent = "Showing " + filtered.length + " of " + allUsers.length + " customers";
+  } else {
+    countEl.textContent = "";
+  }
+
+  renderFilteredUsers(filtered);
+}
+
+function setFilter(btn) {
+  document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("active"); });
+  btn.classList.add("active");
+  filterUsers();
+}
+
+function getSourceBadge(source) {
+  if (!source || source === "manual") return '<span class="badge badge-manual">Manual</span>';
+  if (source === "whop") return '<span class="badge badge-whop">Whop</span>';
+  if (source === "warriorplus") return '<span class="badge badge-warriorplus">W+</span>';
+  if (source === "jvzoo") return '<span class="badge badge-jvzoo">JVZoo</span>';
+  return '<span class="badge badge-source">' + escHtml(source) + '</span>';
+}
+
+function renderFilteredUsers(users) {
+  if (allUsers.length === 0) {
+    document.getElementById("userList").innerHTML = '<div class="empty-state"><p>No customers yet. Add your first one above!</p></div>';
+    return;
+  }
+
+  if (users.length === 0) {
+    document.getElementById("userList").innerHTML = '<div class="empty-state"><p>No customers match your search.</p></div>';
+    return;
+  }
+
+  var html = '<table><thead><tr><th>Customer</th><th>Source</th><th>Guides</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>';
+
+  users.forEach(function(u) {
+    var date = new Date(u.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    var badge = u.active
+      ? '<span class="badge badge-active">Active</span>'
+      : '<span class="badge badge-inactive">Inactive</span>';
+    var indexUrl = "https://app.heychatmate.com/stepwise/" + u.userId + "/";
+    var actionBtn = u.active
+      ? '<button class="btn btn-danger btn-sm" onclick="deactivateUser(\'' + u.userId + '\')">Deactivate</button>'
+      : '<button class="btn btn-sm" style="padding:6px 14px;font-size:12px;background:#1e293b;border:1px solid #22c55e;color:#22c55e;" onclick="reactivateUser(\'' + u.userId + '\')">Reactivate</button>';
+
+    var keyRowId = "key-" + u.userId;
+
+    html += '<tr>' +
+      '<td>' +
+        '<div class="user-name">' + escHtml(u.name) + '</div>' +
+        '<div class="user-email">' + escHtml(u.email || "\u2014") + '</div>' +
+        '<div class="user-id">' + u.userId + '</div>' +
+        '<div id="' + keyRowId + '" style="display:none;margin-top:6px;">' +
+          '<input type="text" value="' + escHtml(u.apiKey || "") + '" readonly style="width:100%;padding:6px 10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#f59e0b;font-size:11px;font-family:monospace;outline:none;" onclick="this.select()">' +
+          '<div style="margin-top:4px;display:flex;gap:6px;">' +
+            '<button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#94a3b8;" onclick="copyUserKey(\'' + escHtml(u.apiKey || "") + '\')">Copy Key</button>' +
+            '<button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:#1e293b;border:1px solid #334155;color:#94a3b8;" onclick="copyUserOnboarding(\'' + escHtml(u.name) + '\', \'' + escHtml(u.apiKey || "") + '\', \'' + u.userId + '\')">Copy Welcome Msg</button>' +
+          '</div>' +
+        '</div>' +
+      '</td>' +
+      '<td>' + getSourceBadge(u.paymentSource) + '</td>' +
+      '<td><span class="guide-count">' + (u.guideCount || 0) + '</span> <a class="guide-link" href="' + indexUrl + '" target="_blank">View</a></td>' +
+      '<td>' + badge + '</td>' +
+      '<td class="date">' + date + '</td>' +
+      '<td style="text-align:right;">' +
+        '<button class="btn btn-sm" style="margin-bottom:4px;padding:4px 10px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#94a3b8;" onclick="toggleKey(\'' + keyRowId + '\', this)">Show Key</button><br>' +
+        actionBtn +
+      '</td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById("userList").innerHTML = html;
+}
+
+// === ADD CUSTOMER ===
+async function addCustomer() {
+  var name = document.getElementById("newName").value.trim();
+  var email = document.getElementById("newEmail").value.trim();
+
+  if (!name) {
+    showToast("Customer name is required");
+    return;
+  }
+
+  var btn = document.getElementById("addBtn");
+  btn.disabled = true;
+  btn.textContent = "Creating...";
+
+  try {
+    var res = await fetch(API + "/register", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + adminKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: name, email: email })
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      var msg = "Welcome to StepWise!\n\n" +
+        "Here's how to get started:\n\n" +
+        "1. Install the StepWise Chrome extension\n" +
+        "2. Record your steps, then click \"Publish \u2014 Get Link\"\n" +
+        "3. When asked for your API key, paste this:\n\n" +
+        data.apiKey + "\n\n" +
+        "That's it! You only need to enter the key once.\n\n" +
+        "Your published guides will appear at:\n" +
+        data.indexUrl;
+
+      document.getElementById("onboardingMsg").value = msg;
+      document.getElementById("newIndexLink").href = data.indexUrl;
+      document.getElementById("keyResult").style.display = "block";
+      document.getElementById("keyResult").dataset.apiKey = data.apiKey;
+
+      document.getElementById("newName").value = "";
+      document.getElementById("newEmail").value = "";
+
+      showToast("Customer created!");
+      refreshUsers();
+      loadStats();
+    } else {
+      showToast("Error: " + (data.error || "Failed"));
+    }
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Create";
+}
+
+function copyOnboarding() {
+  var msg = document.getElementById("onboardingMsg").value;
+  navigator.clipboard.writeText(msg).then(function() {
+    showToast("Onboarding message copied!");
+  });
+}
+
+function copyKeyOnly() {
+  var key = document.getElementById("keyResult").dataset.apiKey;
+  navigator.clipboard.writeText(key).then(function() {
+    showToast("API key copied!");
+  });
+}
+
+// === DEACTIVATE USER ===
+async function deactivateUser(userId) {
+  if (!confirm("Deactivate this customer? Their guides will stay online but they won't be able to publish or delete.")) return;
+
+  try {
+    var res = await fetch(API + "/admin/users/" + userId, {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      showToast("Customer deactivated");
+      refreshUsers();
+      loadStats();
+    } else {
+      showToast("Error: " + (data.error || "Failed"));
+    }
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+}
+
+// === REACTIVATE USER ===
+async function reactivateUser(userId) {
+  if (!confirm("Reactivate this customer? They will be able to publish and delete guides again.")) return;
+
+  try {
+    var res = await fetch(API + "/admin/users/" + userId, {
+      method: "PUT",
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+
+    if (data.success) {
+      showToast("Customer reactivated");
+      refreshUsers();
+      loadStats();
+    } else {
+      showToast("Error: " + (data.error || "Failed"));
+    }
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+}
+
+// === REFRESH ===
+async function refreshUsers() {
+  try {
+    var res = await fetch(API + "/admin/users", {
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+    if (data.success) {
+      renderUsers(data.users);
+    }
+  } catch(e) {}
+}
+
+// === SHOW/HIDE KEY ===
+function toggleKey(rowId, btn) {
+  var row = document.getElementById(rowId);
+  if (row.style.display === "none") {
+    row.style.display = "block";
+    btn.textContent = "Hide Key";
+    btn.style.borderColor = "#f59e0b";
+    btn.style.color = "#f59e0b";
+  } else {
+    row.style.display = "none";
+    btn.textContent = "Show Key";
+    btn.style.borderColor = "#334155";
+    btn.style.color = "#94a3b8";
+  }
+}
+
+function copyUserKey(apiKey) {
+  navigator.clipboard.writeText(apiKey).then(function() {
+    showToast("API key copied!");
+  });
+}
+
+function copyUserOnboarding(name, apiKey, userId) {
+  var indexUrl = "https://app.heychatmate.com/stepwise/" + userId + "/";
+  var msg = "Welcome to StepWise!\n\n" +
+    "Here's how to get started:\n\n" +
+    "1. Install the StepWise Chrome extension\n" +
+    "2. Record your steps, then click \"Publish \u2014 Get Link\"\n" +
+    "3. When asked for your API key, paste this:\n\n" +
+    apiKey + "\n\n" +
+    "That's it! You only need to enter the key once.\n\n" +
+    "Your published guides will appear at:\n" +
+    indexUrl;
+  navigator.clipboard.writeText(msg).then(function() {
+    showToast("Welcome message copied for " + name + "!");
+  });
+}
+
+// === WEBHOOK LOGS ===
+async function loadWebhookLogs() {
+  try {
+    var res = await fetch(API + "/admin/webhook-logs", {
+      headers: { "Authorization": "Bearer " + adminKey }
+    });
+    var data = await res.json();
+
+    if (data.success && data.logs.length > 0) {
+      var html = '<table class="log-table"><thead><tr><th>Time</th><th>Source</th><th>Event</th><th>Email</th><th>Result</th></tr></thead><tbody>';
+      data.logs.forEach(function(log) {
+        var date = new Date(log.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+        html += '<tr>' +
+          '<td class="date">' + date + '</td>' +
+          '<td>' + getSourceBadge(log.source) + '</td>' +
+          '<td style="font-family:monospace;font-size:11px;">' + escHtml(log.event_type) + '</td>' +
+          '<td>' + escHtml(log.email || "\u2014") + '</td>' +
+          '<td style="font-size:11px;color:#94a3b8;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(log.result || "") + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById("webhookLogs").innerHTML = html;
+    } else {
+      document.getElementById("webhookLogs").innerHTML = '<div class="empty-state"><p>No webhook events yet. They will appear here when payment platforms send webhooks.</p></div>';
+    }
+  } catch(e) {
+    document.getElementById("webhookLogs").innerHTML = '<div class="empty-state"><p>Error loading logs: ' + escHtml(e.message) + '</p></div>';
+  }
+}
+
+// === TEST WEBHOOK ===
+async function testWebhook() {
+  var email = document.getElementById("testEmail").value.trim();
+  var name = document.getElementById("testName").value.trim();
+  var source = document.getElementById("testSource").value;
+
+  if (!email) {
+    showToast("Email is required for test webhook");
+    return;
+  }
+
+  var btn = document.getElementById("testBtn");
+  btn.disabled = true;
+  btn.textContent = "Simulating...";
+
+  try {
+    var res = await fetch(API + "/admin/test-webhook", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + adminKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email: email, name: name, source: source })
+    });
+    var data = await res.json();
+
+    var resultDiv = document.getElementById("testResult");
+    var resultText = document.getElementById("testResultText");
+    resultDiv.style.display = "block";
+
+    if (data.success) {
+      resultDiv.style.borderColor = "#22c55e";
+      resultText.textContent = "Account " + (data.isNew ? "CREATED" : "FOUND (already exists)") + "\n\n" +
+        "User ID:    " + data.userId + "\n" +
+        "API Key:    " + data.apiKey + "\n" +
+        "Guides URL: " + data.indexUrl + "\n" +
+        (data.isNew ? "\nWelcome email sent to " + email : "");
+      refreshUsers();
+      loadStats();
+    } else {
+      resultDiv.style.borderColor = "#ef4444";
+      resultText.textContent = "ERROR: " + (data.error || "Unknown error");
+    }
+  } catch(e) {
+    var resultDiv = document.getElementById("testResult");
+    var resultText = document.getElementById("testResultText");
+    resultDiv.style.display = "block";
+    resultDiv.style.borderColor = "#ef4444";
+    resultText.textContent = "ERROR: " + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = "Simulate";
+}
+
+// === UTILS ===
+function escHtml(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+</script>
+
+</body>
+</html>
