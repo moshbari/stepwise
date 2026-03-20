@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 340px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: #0f0f0f; color: #e2e8f0; overflow: hidden; }
+    .header { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .logo { width: 28px; height: 28px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+    .logo svg { width: 16px; height: 16px; }
+    .header h1 { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+    .header small { font-size: 11px; color: #64748b; display: block; }
+    .main { padding: 16px 18px; }
+    .status { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 10px; margin-bottom: 14px; font-size: 13px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot.idle { background: #475569; }
+    .status-dot.recording { background: #ef4444; animation: pulse 1.2s ease-in-out infinite; }
+    .status-dot.has-steps { background: #10b981; }
+    .step-count { margin-left: auto; font-size: 12px; color: #94a3b8; font-weight: 600; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 6px; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; font-family: inherit; }
+    .btn-record { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
+    .btn-record:hover { filter: brightness(1.1); }
+    .btn-continue { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+    .btn-continue:hover { filter: brightness(1.1); }
+    .btn-stop { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+    .btn-stop:hover { background: rgba(239,68,68,0.25); }
+    .btn-secondary { background: rgba(255,255,255,0.06); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.08); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    .btn-export { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; }
+    .btn-export:hover { filter: brightness(1.1); }
+    .btn-sm { padding: 10px; font-size: 13px; }
+    .btn + .btn { margin-top: 8px; }
+    .actions-row { display: flex; gap: 6px; margin-top: 8px; }
+    .actions-row .btn { flex: 1; margin-top: 0; }
+    .steps-preview { margin-top: 14px; max-height: 200px; overflow-y: auto; }
+    .step-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; font-size: 12px; }
+    .step-item:hover { background: rgba(255,255,255,0.04); }
+    .step-num { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+    .step-thumb { width: 36px; height: 24px; border-radius: 4px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+    .step-title { flex: 1; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .empty-state { text-align: center; padding: 24px 16px; color: #475569; font-size: 13px; line-height: 1.5; }
+    .empty-state svg { margin-bottom: 8px; opacity: 0.3; }
+    .footer { padding: 10px 18px 14px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: center; gap: 16px; }
+    .footer span { font-size: 11px; color: #64748b; cursor: pointer; }
+    .footer span:hover { color: #94a3b8; }
+    .footer .upgrade-link { color: #f59e0b; font-weight: 600; }
+    .footer .upgrade-link:hover { color: #fbbf24; }
+    .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 10px 0; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .steps-preview::-webkit-scrollbar { width: 4px; }
+    .steps-preview::-webkit-scrollbar-track { background: transparent; }
+    .steps-preview::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    /* Settings Panel */
+    .settings-panel { display: none; padding: 16px 18px; }
+    .settings-panel.visible { display: block; }
+    .settings-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    .settings-title .back-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px; padding: 4px 8px; border-radius: 6px; }
+    .settings-title .back-btn:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+    .setting-group { margin-bottom: 16px; }
+    .setting-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .setting-label svg { width: 14px; height: 14px; }
+    .api-key-row { display: flex; gap: 4px; }
+    .api-key-input { flex: 1; padding: 9px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e2e8f0; font-size: 12px; font-family: monospace; outline: none; }
+    .api-key-input:focus { border-color: #3b82f6; }
+    .api-key-input::placeholder { color: #475569; }
+    .key-toggle-btn { padding: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; }
+    .key-toggle-btn:hover { background: rgba(255,255,255,0.1); }
+    .key-status { font-size: 11px; margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+    .key-status.saved { color: #10b981; }
+    .key-status.empty { color: #f59e0b; }
+    .voice-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; }
+    .voice-toggle-label { font-size: 13px; color: #cbd5e1; }
+    .voice-toggle-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
+    .toggle-switch { width: 40px; height: 22px; background: #334155; border-radius: 11px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .toggle-switch.active { background: #3b82f6; }
+    .toggle-switch::after { content: ""; position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.2s; }
+    .toggle-switch.active::after { transform: translateX(18px); }
+    .security-note { font-size: 10px; color: #475569; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; line-height: 1.4; }
+    .security-note svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; }
+
+    /* Account / Login Section */
+    .account-section { margin-bottom: 14px; }
+    .login-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; }
+    .login-box .login-title { font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 10px; }
+    .login-input-row { display: flex; gap: 6px; }
+    .login-input { flex: 1; padding: 9px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e2e8f0; font-size: 12px; font-family: monospace; outline: none; }
+    .login-input:focus { border-color: #3b82f6; }
+    .login-input::placeholder { color: #475569; }
+    .login-btn { padding: 9px 16px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; }
+    .login-btn:hover { filter: brightness(1.1); }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-status { font-size: 11px; margin-top: 6px; }
+    .login-status.error { color: #ef4444; }
+    .login-status.success { color: #10b981; }
+    .login-hint { font-size: 10px; color: #475569; margin-top: 6px; line-height: 1.4; }
+    .logged-in-box { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; }
+    .logged-in-info { display: flex; align-items: center; gap: 8px; }
+    .logged-in-avatar { width: 28px; height: 28px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .logged-in-avatar svg { width: 14px; height: 14px; }
+    .logged-in-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .logged-in-label { font-size: 10px; color: #10b981; }
+    .logged-in-actions { display: flex; gap: 10px; }
+    .logged-in-actions span { font-size: 11px; cursor: pointer; }
+    .logged-in-actions .guides-link { color: #f59e0b; }
+    .logged-in-actions .guides-link:hover { color: #fbbf24; }
+    .logged-in-actions .logout-link { color: #ef4444; }
+    .logged-in-actions .logout-link:hover { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+    <div><h1>StepWise</h1><small>Auto-capture documentation</small></div>
+  </div>
+  <div class="main" id="main">
+    <!-- Account: Login or Logged-in state -->
+    <div class="account-section" id="accountSection">
+      <!-- Not logged in -->
+      <div class="login-box" id="loginBox">
+        <div class="login-title">Log in with your API key</div>
+        <div class="login-input-row">
+          <input type="password" class="login-input" id="loginKeyInput" placeholder="sk_live_..." autocomplete="off">
+          <button class="login-btn" id="loginBtn">Log In</button>
+        </div>
+        <div class="login-status" id="loginStatus"></div>
+        <div class="login-hint">Paste the API key from your welcome email.</div>
+      </div>
+      <!-- Logged in -->
+      <div class="logged-in-box" id="loggedInBox" style="display:none">
+        <div class="logged-in-info">
+          <div class="logged-in-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div>
+            <div class="logged-in-name" id="loggedInName">Pro User</div>
+            <div class="logged-in-label">Logged in</div>
+          </div>
+        </div>
+        <div class="logged-in-actions">
+          <span class="guides-link" id="loggedInGuidesLink">My Guides</span>
+          <span class="logout-link" id="loggedInLogoutLink">Log Out</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="status" id="statusBar">
+      <div class="status-dot idle" id="statusDot"></div>
+      <span id="statusText">Ready to record</span>
+      <span class="step-count" id="stepCount" style="display:none">0 steps</span>
+    </div>
+
+    <!-- State: No steps, not recording -->
+    <div id="freshState">
+      <button class="btn btn-record" id="startFreshBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+        Start Recording
+      </button>
+    </div>
+
+    <!-- State: Recording -->
+    <div id="recordingState" style="display:none">
+      <div class="voice-toggle-row" id="voiceToggleRow" style="margin-bottom:8px;">
+        <div>
+          <div class="voice-toggle-label">🎤 Voice Narration</div>
+          <div class="voice-toggle-sub">Speak to auto-fill step descriptions</div>
+        </div>
+        <div class="toggle-switch" id="voiceToggle"></div>
+      </div>
+      <button class="btn btn-stop" id="stopBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+        Stop Recording
+      </button>
+    </div>
+
+    <!-- State: Has steps, not recording -->
+    <div id="hasStepsState" style="display:none">
+      <button class="btn btn-continue" id="continueBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Continue Recording
+      </button>
+      <button class="btn btn-export" id="exportBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Open in Editor
+      </button>
+      <div class="actions-row">
+        <button class="btn btn-secondary btn-sm" id="newRecordBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+          New
+        </button>
+        <button class="btn btn-secondary btn-sm" id="downloadJsonBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          JSON
+        </button>
+        <button class="btn btn-secondary btn-sm" id="clearBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <div class="steps-preview" id="stepsPreview"></div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-title">
+      <span>⚙️ Settings</span>
+      <button class="back-btn" id="settingsBackBtn">✕</button>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        OpenAI API Key
+      </div>
+      <div class="api-key-row">
+        <input type="password" class="api-key-input" id="apiKeyInput" placeholder="sk-..." autocomplete="off">
+        <button class="key-toggle-btn" id="keyToggleBtn" title="Show/Hide">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="key-status empty" id="keyStatus">⚠ No API key saved</div>
+      <div id="proNote" style="display:none;font-size:10px;color:#f59e0b;margin-top:6px;padding:6px 8px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:6px;">⭐ Pro users: This is optional. Your subscription includes AI features.</div>
+      <div class="security-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Your key is encrypted and stored locally on your device only. It is never sent anywhere except directly to OpenAI's API. StepWise cannot see your key.
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        Voice Narration
+      </div>
+      <div class="voice-toggle-row">
+        <div>
+          <div class="voice-toggle-label">Auto-dictation during recording</div>
+          <div class="voice-toggle-sub">Your voice fills step descriptions automatically</div>
+        </div>
+        <div class="toggle-switch" id="voiceToggleSettings"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Help</span>
+    <span id="settingsLink">Settings</span>
+    <span class="upgrade-link" id="upgradeLink">Upgrade to Pro</span>
+    <span>v2.0.0</span>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
