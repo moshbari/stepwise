@@ -9,6 +9,7 @@ const path = require("path");
 const crypto = require("crypto");
 const mysql = require("mysql2/promise");
 const nodemailer = require("nodemailer");
+const { execSync } = require("child_process");
 
 // === CONFIG ===
 const PORT = 3600;
@@ -1717,9 +1718,62 @@ var server = http.createServer(async function(req, res) {
 // === STARTUP ===
 // ==========================================
 
+// Bootstrap: rebuild extension zip + copy downloads page on every server start.
+// This is the safety net that guarantees the downloads page always has a fresh zip
+// matching the current manifest.json version. Runs once per process restart.
+function bootstrapExtensionDownloads() {
+  const REPO_DIR = "/root/stepwise-repo";
+  const DOWNLOADS_DIR = path.join(GUIDES_DIR, "downloads");
+
+  try {
+    if (!fs.existsSync(REPO_DIR)) {
+      console.log("[BOOTSTRAP] Repo dir not found at " + REPO_DIR + " — skipping zip rebuild");
+      return;
+    }
+
+    // Read current manifest version from the freshly-pulled repo
+    const manifestPath = path.join(REPO_DIR, "manifest.json");
+    if (!fs.existsSync(manifestPath)) {
+      console.log("[BOOTSTRAP] manifest.json not found in repo — skipping zip rebuild");
+      return;
+    }
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const version = "v" + manifest.version;
+    const zipName = "stepwise-extension-" + version + ".zip";
+    const zipPath = path.join(DOWNLOADS_DIR, zipName);
+
+    // Ensure downloads directory exists
+    if (!fs.existsSync(DOWNLOADS_DIR)) {
+      fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
+    }
+
+    // Always rebuild the current-version zip from the latest repo files.
+    // The list of files is explicit — no accidental inclusion of server/, docs, etc.
+    console.log("[BOOTSTRAP] Rebuilding extension zip: " + zipName);
+    const fileList = "manifest.json background.js content.js content.css editor.html editor.js popup.html popup.js icons/";
+    const zipCmd = "cd " + REPO_DIR + " && rm -f '" + zipPath + "' && zip -r '" + zipPath + "' " + fileList + " -x '*.DS_Store' -x '__MACOSX/*'";
+    execSync(zipCmd, { encoding: "utf8", timeout: 30000 });
+    const zipStats = fs.statSync(zipPath);
+    console.log("[BOOTSTRAP] Zip created: " + zipName + " (" + Math.round(zipStats.size / 1024) + " KB)");
+
+    // Copy downloads.html -> index.html
+    const htmlSrc = path.join(REPO_DIR, "server", "downloads.html");
+    const htmlDest = path.join(DOWNLOADS_DIR, "index.html");
+    if (fs.existsSync(htmlSrc)) {
+      fs.copyFileSync(htmlSrc, htmlDest);
+      console.log("[BOOTSTRAP] Downloads page updated");
+    }
+  } catch (err) {
+    console.error("[BOOTSTRAP] Failed:", err.message);
+  }
+}
+
 async function startServer() {
   await initDatabase();
   initEmail();
+
+  // Rebuild downloads zip + page before accepting traffic
+  bootstrapExtensionDownloads();
 
   server.listen(PORT, "0.0.0.0", function() {
     console.log("StepWise Publish API running on port " + PORT);

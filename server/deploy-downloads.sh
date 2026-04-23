@@ -2,11 +2,11 @@
 # Deploy StepWise Downloads Page
 # Run from the stepwise project root: bash server/deploy-downloads.sh
 # Usage: bash server/deploy-downloads.sh [version]
-# Example: bash server/deploy-downloads.sh v1.2.0
+# Example: bash server/deploy-downloads.sh v2.4.5
 
 set -e
 
-VERSION="${1:-v1.2.0}"
+VERSION="${1:-v2.4.5}"
 REMOTE="root@109.205.182.135"
 REMOTE_DIR="/home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/downloads"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,14 +15,22 @@ echo "=== StepWise Extension Deploy ==="
 echo "Version: $VERSION"
 echo ""
 
-# 1. Create zip of the extension
-echo "[1/4] Zipping extension..."
+# 1. Create zip of the extension (zip from ROOT, include ONLY extension files)
+echo "[1/4] Zipping extension from repo root..."
 cd "$PROJECT_DIR"
 ZIP_NAME="stepwise-extension-${VERSION}.zip"
 rm -f "$ZIP_NAME"
-cd extension
-zip -r "../$ZIP_NAME" . -x "*.DS_Store" -x "__MACOSX/*"
-cd ..
+zip -r "$ZIP_NAME" \
+  manifest.json \
+  background.js \
+  content.js \
+  content.css \
+  editor.html \
+  editor.js \
+  popup.html \
+  popup.js \
+  icons/ \
+  -x "*.DS_Store" -x "__MACOSX/*"
 ZIP_SIZE=$(du -h "$ZIP_NAME" | cut -f1)
 echo "  Created: $ZIP_NAME ($ZIP_SIZE)"
 
@@ -45,10 +53,3 @@ echo ""
 echo "=== Done! ==="
 echo "Downloads page: https://app.heychatmate.com/stepwise/downloads/"
 echo "Direct zip:     https://app.heychatmate.com/stepwise/downloads/$ZIP_NAME"
-echo ""
-echo "To add older versions, run:"
-echo "  git stash"
-echo "  git checkout <commit> -- extension/"
-echo "  bash server/deploy-downloads.sh v1.0.0"
-echo "  git checkout main -- extension/"
-echo "  git stash pop"

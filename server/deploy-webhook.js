@@ -68,9 +68,41 @@ function deploy() {
     execSync("cp " + REPO_DIR + "/server/admin.html /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/admin.html", { encoding: "utf8" });
     execSync("cp " + REPO_DIR + "/server/privacy.html /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/privacy.html", { encoding: "utf8" });
 
+    // Build fresh extension zip + copy downloads.html
+    // Reads version from manifest.json so zip filename always matches.
+    // Zips from repo ROOT — not from any stale subfolder.
+    try {
+      console.log("[DEPLOY] Building extension zip...");
+      var manifest = JSON.parse(fs.readFileSync(REPO_DIR + "/manifest.json", "utf8"));
+      var zipVersion = "v" + manifest.version;
+      var zipName = "stepwise-extension-" + zipVersion + ".zip";
+      var downloadsDir = "/home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/downloads";
+      execSync("mkdir -p " + downloadsDir, { encoding: "utf8" });
+      var fileList = "manifest.json background.js content.js content.css editor.html editor.js popup.html popup.js icons/";
+      execSync("cd " + REPO_DIR + " && rm -f '" + downloadsDir + "/" + zipName + "' && zip -r '" + downloadsDir + "/" + zipName + "' " + fileList + " -x '*.DS_Store' -x '__MACOSX/*'", { encoding: "utf8", timeout: 30000 });
+      execSync("cp " + REPO_DIR + "/server/downloads.html " + downloadsDir + "/index.html", { encoding: "utf8" });
+      console.log("[DEPLOY] Extension zip built: " + zipName);
+    } catch(zipErr) {
+      console.error("[DEPLOY] Zip step failed (non-fatal):", zipErr.message);
+    }
+
     // Restart the publish API
     console.log("[DEPLOY] Restarting stepwise-publish...");
     execSync("pm2 restart stepwise-publish", { encoding: "utf8" });
+
+    // Restart self so future pushes pick up any webhook code changes.
+    // Delayed via detached process so the current deploy() can return cleanly.
+    console.log("[DEPLOY] Scheduling self-restart...");
+    try {
+      const { spawn } = require("child_process");
+      const child = spawn("sh", ["-c", "sleep 3 && pm2 restart stepwise-deploy"], {
+        detached: true,
+        stdio: "ignore"
+      });
+      child.unref();
+    } catch(e) {
+      console.error("[DEPLOY] Self-restart schedule failed:", e.message);
+    }
 
     console.log("[DEPLOY] Done!");
     return { success: true, message: "Deployed successfully" };

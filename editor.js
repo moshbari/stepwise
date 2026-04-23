@@ -230,6 +230,13 @@ var recPollInterval = null;
 var lastKnownStepCount = 0;
 
 document.addEventListener("DOMContentLoaded", function() {
+  // Inject version from manifest (so this label can never go stale)
+  try {
+    var v = chrome.runtime.getManifest().version;
+    var versionEl = document.getElementById("swVersion");
+    if (versionEl) versionEl.textContent = "v" + v;
+  } catch(e) {}
+
   document.getElementById("addStepBtn").addEventListener("click", addManualStep);
   document.getElementById("logoutLink").addEventListener("click", logoutAccount);
   document.getElementById("dropZone").addEventListener("click", function() { document.getElementById("jsonFileInput").click(); });

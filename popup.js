@@ -32,6 +32,13 @@ function decryptKey(encoded) {
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", function() {
+  // Inject version from manifest (so this label can never go stale)
+  try {
+    var v = chrome.runtime.getManifest().version;
+    var versionEl = document.getElementById("popupVersion");
+    if (versionEl) versionEl.textContent = "v" + v;
+  } catch(e) {}
+
   document.getElementById("startFreshBtn").addEventListener("click", startFresh);
   document.getElementById("stopBtn").addEventListener("click", stopRecording);
   document.getElementById("continueBtn").addEventListener("click", continueRecording);
