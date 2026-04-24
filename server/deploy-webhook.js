@@ -59,6 +59,15 @@ function deploy() {
     execSync("cp " + REPO_DIR + "/server/server.js /root/stepwise-publish/server.js", { encoding: "utf8" });
     execSync("cp " + REPO_DIR + "/server/package.json /root/stepwise-publish/package.json", { encoding: "utf8" });
 
+    // Self-update: keep /root/stepwise-deploy/deploy-webhook.js in sync with
+    // the repo so this webhook can upgrade itself on future pushes. The
+    // pm2 self-restart at the end of deploy() will then pick up any changes.
+    try {
+      execSync("cp " + REPO_DIR + "/server/deploy-webhook.js /root/stepwise-deploy/deploy-webhook.js", { encoding: "utf8" });
+    } catch(selfUpdateErr) {
+      console.error("[DEPLOY] Self-update copy failed (non-fatal):", selfUpdateErr.message);
+    }
+
     // Install/update dependencies
     console.log("[DEPLOY] Installing dependencies...");
     execSync("cd /root/stepwise-publish && npm install --production", { encoding: "utf8", timeout: 60000 });
