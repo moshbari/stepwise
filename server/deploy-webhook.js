@@ -68,6 +68,45 @@ function deploy() {
     execSync("cp " + REPO_DIR + "/server/admin.html /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/admin.html", { encoding: "utf8" });
     execSync("cp " + REPO_DIR + "/server/privacy.html /home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/privacy.html", { encoding: "utf8" });
 
+    // --- Deploy video-server if it changed ---
+    // Syncs repo /video-server/*.js and package.json into /opt/stepwise-video/,
+    // runs npm install if package.json changed, and restarts the pm2 process.
+    // Non-fatal: if anything here fails, the publish-api deploy still succeeds.
+    try {
+      var VIDEO_SERVER_SRC = REPO_DIR + "/video-server";
+      var VIDEO_SERVER_DST = "/opt/stepwise-video";
+      if (fs.existsSync(VIDEO_SERVER_SRC)) {
+        console.log("[DEPLOY] Syncing video-server to " + VIDEO_SERVER_DST + "...");
+        execSync("mkdir -p " + VIDEO_SERVER_DST, { encoding: "utf8" });
+
+        // Copy JS files (server.js, ghl-uploader.js, etc.)
+        execSync("cp " + VIDEO_SERVER_SRC + "/*.js " + VIDEO_SERVER_DST + "/", { encoding: "utf8" });
+
+        // Check if package.json changed — if so, run npm install
+        var pkgSrc = VIDEO_SERVER_SRC + "/package.json";
+        var pkgDst = VIDEO_SERVER_DST + "/package.json";
+        var pkgChanged = false;
+        if (fs.existsSync(pkgSrc)) {
+          var srcPkg = fs.readFileSync(pkgSrc, "utf8");
+          var dstPkg = fs.existsSync(pkgDst) ? fs.readFileSync(pkgDst, "utf8") : "";
+          if (srcPkg !== dstPkg) {
+            fs.writeFileSync(pkgDst, srcPkg);
+            pkgChanged = true;
+          }
+        }
+        if (pkgChanged) {
+          console.log("[DEPLOY] video-server package.json changed — running npm install...");
+          execSync("cd " + VIDEO_SERVER_DST + " && npm install --production", { encoding: "utf8", timeout: 120000 });
+        }
+
+        console.log("[DEPLOY] Restarting stepwise-video...");
+        execSync("pm2 restart stepwise-video", { encoding: "utf8" });
+        console.log("[DEPLOY] video-server deployed.");
+      }
+    } catch(videoErr) {
+      console.error("[DEPLOY] video-server deploy failed (non-fatal):", videoErr.message);
+    }
+
     // Build fresh extension zip + copy downloads.html
     // Reads version from manifest.json so zip filename always matches.
     // Zips from repo ROOT — not from any stale subfolder.
