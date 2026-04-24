@@ -232,21 +232,65 @@ async function createTitleCard(jobDir, title, description) {
   const clipPath = path.join(jobDir, "title_card.mp4");
   const duration = 3;
 
+  // Layout constants. 120px side padding on a 1920px frame leaves 1680px of
+  // usable width — generous enough to feel airy without looking empty.
+  const FRAME_W = 1920;
+  const SIDE_PADDING = 120;
+  const MAX_TEXT_W = FRAME_W - (SIDE_PADDING * 2); // 1680
+
+  // Fit the title: word-wrap up to 3 lines, shrink font if still overflowing.
+  // Base fontsize 64 for a bolder, more-confident title look.
+  const titleFit = wrapTextForDrawtext(
+    title || "StepWise Documentation",
+    64,
+    MAX_TEXT_W,
+    { bold: true, maxLines: 3, minFontSize: 36 }
+  );
+
   // Write the text to files and use FFmpeg's `textfile=` option so we never
   // have to escape user-supplied characters inside the filter-graph string.
   // (Inlining `text='...'` with an escape function has historically broken on
   // certain combinations of `'`, `:`, `=` — producing the "Both text and text
   // file provided" error. `textfile=` sidesteps that entire class of bugs.)
   const titlePath = path.join(jobDir, "title_card_title.txt");
-  fs.writeFileSync(titlePath, sanitizeForTextfile(title));
+  fs.writeFileSync(titlePath, sanitizeForTextfile(titleFit.text));
 
-  let filter = "color=c=#1E293B:s=1920x1080:d=" + duration;
-  filter += ",drawtext=textfile=" + escapeFilterPath(titlePath) + ":fontsize=56:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+  let filter = "color=c=#1E293B:s=" + FRAME_W + "x1080:d=" + duration;
+
+  // Title: positioned so its bottom sits 30px above the vertical centre when
+  // there's a description (stacked layout), otherwise classic centered.
+  // text_h here is per-filter — it measures the title's own rendered height,
+  // which may span multiple lines thanks to wrapping above.
+  const titleY = description ? "h/2-text_h-30" : "(h-text_h)/2";
+  filter += ",drawtext=textfile=" + escapeFilterPath(titlePath) +
+    ":fontsize=" + titleFit.fontSize +
+    ":fontcolor=white" +
+    ":line_spacing=14" +
+    ":text_align=C" +  // per-line horizontal centering (FFmpeg 6+)
+    ":x=(w-text_w)/2" +
+    ":y=" + titleY +
+    ":fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
   if (description) {
+    // Description: smaller, lighter colour, sits 30px below the vertical
+    // centre. Wrapped up to 2 lines, shrunk if long.
+    const descFit = wrapTextForDrawtext(
+      description,
+      30,
+      MAX_TEXT_W,
+      { bold: false, maxLines: 2, minFontSize: 22 }
+    );
     const descPath = path.join(jobDir, "title_card_desc.txt");
-    fs.writeFileSync(descPath, sanitizeForTextfile(description));
-    filter += ",drawtext=textfile=" + escapeFilterPath(descPath) + ":fontsize=28:fontcolor=#94a3b8:x=(w-text_w)/2:y=(h-text_h)/2+40:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+    fs.writeFileSync(descPath, sanitizeForTextfile(descFit.text));
+
+    filter += ",drawtext=textfile=" + escapeFilterPath(descPath) +
+      ":fontsize=" + descFit.fontSize +
+      ":fontcolor=#94a3b8" +
+      ":line_spacing=10" +
+      ":text_align=C" +
+      ":x=(w-text_w)/2" +
+      ":y=h/2+30" +
+      ":fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
   }
 
   // Generate silent audio track (needed for concat to work)
@@ -269,6 +313,17 @@ async function createTitleCard(jobDir, title, description) {
 async function createStepClip(imgPath, audioPath, clipPath, stepNum, stepTitle, description, duration) {
   const jobDir = path.dirname(clipPath);
 
+  // Fit subtitle inside a bounded width (so the dark box doesn't stretch
+  // edge-to-edge), wrapping to 2 lines if needed. Allow up to ~180 chars of
+  // narration to appear as subtitle before further shrinking kicks in.
+  const SUBTITLE_MAX_W = 1500;   // 210px clear space on each side of a 1920 frame
+  const subtitleFit = wrapTextForDrawtext(
+    truncateText(description, 180),
+    26,
+    SUBTITLE_MAX_W,
+    { bold: false, maxLines: 2, minFontSize: 20 }
+  );
+
   // Write label + subtitle text to .txt files and feed them to FFmpeg via
   // `textfile=`. This avoids escaping user-supplied content inside the
   // filter-graph string, which is what was producing the
@@ -276,7 +331,7 @@ async function createStepClip(imgPath, audioPath, clipPath, stepNum, stepTitle, 
   const labelPath = path.join(jobDir, "step_" + stepNum + "_label.txt");
   const descPath  = path.join(jobDir, "step_" + stepNum + "_desc.txt");
   fs.writeFileSync(labelPath, sanitizeForTextfile("Step " + stepNum));
-  fs.writeFileSync(descPath,  sanitizeForTextfile(truncateText(description, 80)));
+  fs.writeFileSync(descPath,  sanitizeForTextfile(subtitleFit.text));
 
   // Video filter:
   // 1. Scale image to fit 1920x1080 (keep aspect ratio, pad with dark bg)
@@ -287,8 +342,18 @@ async function createStepClip(imgPath, audioPath, clipPath, stepNum, stepTitle, 
   // Step number overlay (top-left badge)
   vf += ",drawtext=textfile=" + escapeFilterPath(labelPath) + ":fontsize=32:fontcolor=white:x=30:y=25:box=1:boxcolor=#2563EB@0.85:boxborderw=12:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
-  // Subtitle bar at bottom
-  vf += ",drawtext=textfile=" + escapeFilterPath(descPath) + ":fontsize=26:fontcolor=white:x=(w-text_w)/2:y=h-65:box=1:boxcolor=black@0.65:boxborderw=14:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+  // Subtitle bar at bottom — y=h-text_h-50 anchors the bottom of the text
+  // 50px from the frame edge regardless of how many lines the subtitle
+  // wrapped into, so a 1-line or 2-line subtitle both look properly seated.
+  vf += ",drawtext=textfile=" + escapeFilterPath(descPath) +
+    ":fontsize=" + subtitleFit.fontSize +
+    ":fontcolor=white" +
+    ":line_spacing=8" +
+    ":text_align=C" +
+    ":x=(w-text_w)/2" +
+    ":y=h-text_h-50" +
+    ":box=1:boxcolor=black@0.65:boxborderw=14" +
+    ":fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
   await runFFmpeg([
     "-loop", "1",
@@ -417,6 +482,81 @@ function escapeFilterPath(p) {
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'")
     .replace(/:/g, "\\:");
+}
+
+// Word-wrap text so it fits within a given pixel width when rendered by
+// FFmpeg drawtext. Drawtext doesn't wrap on its own, so long titles would
+// otherwise overflow the frame. The algorithm is:
+//   1. At the current fontsize, estimate how many chars fit per line
+//      (using a conservative char-width ratio for the chosen weight).
+//   2. Word-wrap into lines.
+//   3. If that produces more than maxLines, shrink the fontsize by 10% and
+//      retry, down to minFontSize.
+// Returns { text, fontSize } — text may contain "\n" for multi-line.
+function wrapTextForDrawtext(text, fontSize, maxWidthPx, opts) {
+  opts = opts || {};
+  // Conservative char-width estimates for DejaVu Sans. Bold is wider.
+  const charWidthRatio = opts.bold ? 0.60 : 0.55;
+  const maxLines = opts.maxLines || 2;
+  const minFontSize = opts.minFontSize || 28;
+
+  if (!text) return { text: "", fontSize };
+
+  let currentFontSize = fontSize;
+  while (currentFontSize >= minFontSize) {
+    const charWidth = currentFontSize * charWidthRatio;
+    const maxCharsPerLine = Math.max(8, Math.floor(maxWidthPx / charWidth));
+
+    // Single-line fits at this size — done.
+    if (text.length <= maxCharsPerLine) {
+      return { text, fontSize: currentFontSize };
+    }
+
+    // Greedy word-wrap.
+    const words = text.split(/\s+/).filter(function(w) { return w.length > 0; });
+    const lines = [];
+    let current = "";
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      const candidate = current ? current + " " + w : w;
+      if (candidate.length > maxCharsPerLine && current) {
+        lines.push(current);
+        current = w;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current) lines.push(current);
+
+    // If a single word is longer than the line limit (unusual), we'll still
+    // accept it — shrinking further won't help. Otherwise fit check.
+    const longest = lines.reduce(function(m, l) { return Math.max(m, l.length); }, 0);
+    if (lines.length <= maxLines && longest <= maxCharsPerLine) {
+      return { text: lines.join("\n"), fontSize: currentFontSize };
+    }
+
+    // Too many lines or some line still overflows — shrink font and retry.
+    currentFontSize = Math.floor(currentFontSize * 0.9);
+  }
+
+  // Fallback: wrap at minFontSize and accept whatever lines we get.
+  const charWidth = minFontSize * charWidthRatio;
+  const maxCharsPerLine = Math.max(8, Math.floor(maxWidthPx / charWidth));
+  const words = text.split(/\s+/).filter(function(w) { return w.length > 0; });
+  const lines = [];
+  let current = "";
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const candidate = current ? current + " " + w : w;
+    if (candidate.length > maxCharsPerLine && current) {
+      lines.push(current);
+      current = w;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return { text: lines.join("\n"), fontSize: minFontSize };
 }
 
 function truncateText(text, maxLen) {
