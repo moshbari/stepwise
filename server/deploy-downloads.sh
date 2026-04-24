@@ -6,7 +6,7 @@
 
 set -e
 
-VERSION="${1:-v2.4.5}"
+VERSION="${1:-v2.4.6}"
 REMOTE="root@109.205.182.135"
 REMOTE_DIR="/home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/downloads"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

@@ -56,8 +56,31 @@
   <div class="version-card latest">
     <div class="version-header">
       <div>
-        <span class="version-name">v2.4.5</span>
+        <span class="version-name">v2.4.6</span>
         <span class="badge">LATEST</span>
+      </div>
+      <span class="version-date">Apr 24, 2026</span>
+    </div>
+    <div class="changes fixed">
+      <h4>Critical Fix</h4>
+      <ul>
+        <li>Cloud projects now stay fully editable after save and reload &mdash; circles, rectangles, arrows, callouts, step numbers, blur boxes, and pen strokes are preserved as editable objects instead of being flattened into the screenshot</li>
+        <li>Published HTML pages now embed the raw project data as a hidden JSON block, so <strong>Import from Published Guide</strong> also restores fully editable annotations (was previously baked pixels)</li>
+        <li>Live canvas shapes are now force-synced into step data on every save path, so no in-progress drawing can be lost on a fast save-to-cloud</li>
+        <li>Defensive recovery: if the cloud endpoint ever returns a project with empty annotations (old project, or payload truncation), the extension now silently falls back to fetching the published HTML and recovering the editable state from it</li>
+        <li><strong>After updating</strong>, open any existing cloud project and click Publish once &mdash; that writes the embedded data into its HTML and makes future loads fully editable</li>
+      </ul>
+    </div>
+    <a href="stepwise-extension-v2.4.6.zip" class="download-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download v2.4.6
+    </a>
+  </div>
+
+  <div class="version-card">
+    <div class="version-header">
+      <div>
+        <span class="version-name">v2.4.5</span>
       </div>
       <span class="version-date">Apr 23, 2026</span>
     </div>

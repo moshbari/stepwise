@@ -1526,6 +1526,21 @@ function saveShapes(sid) {
   if (step) step.annotations = JSON.parse(JSON.stringify(as.shapes));
 }
 
+// Force-sync every step's live canvas shapes into step.annotations.
+// Call this before any save operation so annotations are never lost to the cloud.
+function syncAllAnnotationsToState() {
+  if (!state || !state.steps) return;
+  state.steps.forEach(function(step) {
+    if (!step || !step.id) return;
+    var as = annoState[step.id];
+    if (as && Array.isArray(as.shapes)) {
+      step.annotations = JSON.parse(JSON.stringify(as.shapes));
+    } else if (!Array.isArray(step.annotations)) {
+      step.annotations = [];
+    }
+  });
+}
+
 function undoAnnotation(sid) {
   var as = getAS(sid);
   if (!as || as.historyIndex <= 0) return;
@@ -3265,9 +3280,11 @@ async function quickSaveProject() {
 }
 
 async function writeProjectToHandle(handle) {
+  // Flush live canvas shapes into step.annotations first.
+  syncAllAnnotationsToState();
   var projectData = {
     format: "stepwise-project",
-    version: "1.3",
+    version: "1.4",
     title: document.getElementById("docTitle").value || "",
     subtitle: document.getElementById("docSubtitle").value || "",
     brand: state.brand,
@@ -3514,6 +3531,10 @@ async function saveToCloud() {
   if (!(await ensureApiKey())) return;
   if (state.steps.length === 0) { showToast("No steps to save"); return; }
 
+  // CRITICAL: Flush live canvas shapes into step.annotations before serializing,
+  // otherwise in-progress annotations never make it to the cloud.
+  syncAllAnnotationsToState();
+
   var btn = document.getElementById("saveCloudBtn");
   btn.disabled = true;
   btn.textContent = "⏳ Saving...";
@@ -3522,10 +3543,12 @@ async function saveToCloud() {
     var title = document.getElementById("docTitle").value || "Untitled Guide";
     var projectData = {
       format: "stepwise-project",
-      version: "1.1",
+      version: "1.4",
       title: title,
       subtitle: document.getElementById("docSubtitle").value || "",
       brand: state.brand,
+      cta: ctaState,
+      videoUrl: state.videoUrl || null,
       steps: state.steps,
       savedAt: new Date().toISOString()
     };
@@ -3562,9 +3585,11 @@ async function saveToCloud() {
 // Background auto-save (called after publish, non-blocking)
 function autoSaveToCloud(titleStr, slugStr) {
   try {
+    // Flush live canvas shapes into step.annotations before sending.
+    syncAllAnnotationsToState();
     var projectData = {
       format: "stepwise-project",
-      version: "1.3",
+      version: "1.4",
       title: titleStr,
       subtitle: document.getElementById("docSubtitle").value || "",
       brand: state.brand,
@@ -3667,9 +3692,40 @@ async function loadFromCloud(projectSlug) {
 
     if (!data.steps) throw new Error("Invalid project data");
 
+    // DEFENSIVE RECOVERY: if the backend returned steps with no annotations
+    // (e.g. the project was saved by an older version before the annotations
+    // array was preserved, or the payload was truncated on its way through
+    // the cloud), try to recover the fully-editable project from the
+    // embedded JSON inside the published HTML.
+    var totalAnno = 0;
+    (data.steps || []).forEach(function(s) { if (Array.isArray(s.annotations)) totalAnno += s.annotations.length; });
+    if (totalAnno === 0) {
+      try {
+        var htmlUrl = "https://app.heychatmate.com/stepwise/" + projectSlug + ".html";
+        var htmlRes = await fetch(htmlUrl, { cache: "no-store" });
+        if (htmlRes.ok) {
+          var htmlText = await htmlRes.text();
+          var recovered = importFromPublishedHTML(htmlText);
+          // Only use the recovered payload if it actually contains annotations
+          // AND raw (non-scraped) step data. We can tell because recovered
+          // steps from the embedded JSON have the same ids/fields as state.
+          var recoveredAnno = 0;
+          if (recovered && Array.isArray(recovered.steps)) {
+            recovered.steps.forEach(function(s) { if (Array.isArray(s.annotations)) recoveredAnno += s.annotations.length; });
+          }
+          if (recoveredAnno > 0) {
+            data = Object.assign({}, data, recovered);
+            console.log("StepWise: recovered " + recoveredAnno + " editable annotations from published HTML.");
+          }
+        }
+      } catch (recoverErr) {
+        console.warn("StepWise: could not recover annotations from published HTML:", recoverErr);
+      }
+    }
+
     resetProjectState();
     state.steps = data.steps || [];
-    state.steps.forEach(function(s) { if (!s.annotations) s.annotations = []; });
+    state.steps.forEach(function(s) { if (!Array.isArray(s.annotations)) s.annotations = []; });
 
     if (data.title) document.getElementById("docTitle").value = data.title;
     if (data.subtitle) document.getElementById("docSubtitle").value = data.subtitle;
@@ -3747,7 +3803,7 @@ async function importFromGuideList() {
       return;
     }
 
-    var html = '<div style="margin-bottom:12px;padding:8px 12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;font-size:11px;color:#f59e0b;">Note: Annotations in imported guides are baked into the screenshots and cannot be edited separately. You can add new annotations on top.</div>';
+    var html = '<div style="margin-bottom:12px;padding:8px 12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:8px;font-size:11px;color:#22c55e;">Guides published with the latest StepWise embed editable annotations inside the HTML \u2014 imports will restore circles, rectangles, arrows, callouts and step numbers as editable objects. Older guides (published before this update) still import with baked\u2011in annotations.</div>';
     html += '<div style="display:flex;flex-direction:column;gap:8px;">';
     data.guides.forEach(function(g) {
       var dateStr = g.publishedAt ? new Date(g.publishedAt).toLocaleDateString() : "";
@@ -3831,6 +3887,27 @@ function importFromPublishedHTML(htmlString) {
   var parser = new DOMParser();
   var doc = parser.parseFromString(htmlString, "text/html");
 
+  // PREFERRED PATH: if the HTML was published by a newer build of StepWise,
+  // the full raw project payload is embedded as a JSON <script> block.
+  // Use that so annotations (circles, rectangles, arrows, callouts, step
+  // numbers, etc.) come back as editable objects instead of baked pixels.
+  var embedded = doc.getElementById("stepwise-project-data");
+  if (embedded && embedded.textContent) {
+    try {
+      var parsed = JSON.parse(embedded.textContent);
+      if (parsed && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+        // Normalize: guarantee every step has an annotations array.
+        parsed.steps.forEach(function(s) { if (!Array.isArray(s.annotations)) s.annotations = []; });
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("StepWise: embedded project JSON failed to parse, falling back to scrape.", e);
+    }
+  }
+
+  // LEGACY FALLBACK: scrape the rendered HTML. Annotations recovered this
+  // way are baked into the screenshot pixels and are NOT editable.
+
   // Extract title
   var title = "";
   var h1 = doc.querySelector("h1");
@@ -3904,11 +3981,33 @@ function importFromPublishedHTML(htmlString) {
 }
 
 async function generateHTMLContent() {
+  // Flush live canvas shapes into step.annotations so the embedded raw
+  // project data reflects the latest edits.
+  syncAllAnnotationsToState();
+
   var title = document.getElementById("docTitle").value || "Documentation";
   var subtitle = document.getElementById("docSubtitle").value || "";
   var brand = state.brand;
   var merged = [];
   for (var i = 0; i < state.steps.length; i++) merged.push(await getMergedImage(state.steps[i]));
+
+  // Build the raw project payload that the editor can use to RESTORE EDITABLE
+  // annotations when this HTML is later imported. Viewers never see this —
+  // it's a hidden <script type="application/json"> block.
+  var rawProjectData = {
+    format: "stepwise-project",
+    version: "1.4",
+    title: title,
+    subtitle: subtitle,
+    brand: state.brand,
+    cta: ctaState,
+    videoUrl: state.videoUrl || null,
+    steps: state.steps, // raw screenshots + separate editable annotations
+    savedAt: new Date().toISOString()
+  };
+  // Escape </script> so we never break out of the script tag.
+  var rawProjectJSON = JSON.stringify(rawProjectData).replace(/<\/script/gi, "<\\/script");
+  var embeddedDataTag = '<script type="application/json" id="stepwise-project-data">' + rawProjectJSON + '<\/script>';
 
   // Build CTA button HTML if enabled
   var ctaHtml = "";
@@ -3938,7 +4037,7 @@ async function generateHTMLContent() {
     videoHtml = '<div class="video-section"><video controls playsinline preload="metadata"><source src="' + state.videoUrl + '" type="video/mp4">Your browser does not support the video tag.</video></div>';
   }
 
-  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>' + esc(title) + '</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}body{font-family:"Inter",-apple-system,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}.container{max-width:800px;margin:0 auto;padding:40px 24px}.header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid #e2e8f0}.logo{max-height:40px;margin-bottom:16px}h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;color:#0f172a;margin-bottom:8px}.subtitle{font-size:16px;color:#64748b}.meta{font-size:12px;color:#94a3b8;margin-top:12px}.video-section{margin-bottom:40px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}.video-section video{width:100%;display:block;max-height:500px}.step{margin-bottom:40px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}.step-header{display:flex;align-items:center;gap:12px;padding:16px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0}.step-num{width:32px;height:32px;border-radius:50%;background:' + brand.primaryColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}.step-title{font-size:16px;font-weight:600}.step-body{padding:20px}.step-screenshot{width:100%;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px}.step-description{font-size:15px;color:#475569;line-height:1.7}.step-url{font-size:11px;color:#94a3b8;font-family:monospace;margin-top:8px;padding:4px 8px;background:#f1f5f9;border-radius:4px;display:inline-block}.footer{text-align:center;padding:32px 0;border-top:1px solid #e2e8f0;margin-top:48px;font-size:12px;color:#94a3b8}.toc{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:24px;margin-bottom:40px}.toc h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:12px}.toc-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155;text-decoration:none}.toc-item:last-child{border-bottom:none}.toc-item:hover{color:' + brand.primaryColor + '}.toc-num{width:24px;height:24px;border-radius:50%;background:' + brand.primaryColor + '15;color:' + brand.primaryColor + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}' + ctaCss + '@media print{body{background:#fff}.step{break-inside:avoid;box-shadow:none}}</style></head><body><div class="container"><div class="header">' + logoH + '<h1>' + esc(title) + '</h1>' + (subtitle ? '<p class="subtitle">' + esc(subtitle) + '</p>' : '') + '<p class="meta">' + state.steps.length + ' steps \u2022 Generated ' + new Date().toLocaleDateString() + '</p></div>' + videoHtml + '<div class="toc"><h2>Table of Contents</h2>' + tocHtml + '</div>' + stepsHtml + '<div class="footer"><div>Created with StepWise \u2022 ' + esc(brand.name) + ' \u2022 ' + new Date().getFullYear() + '</div></div></div></body></html>';
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>' + esc(title) + '</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}body{font-family:"Inter",-apple-system,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}.container{max-width:800px;margin:0 auto;padding:40px 24px}.header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid #e2e8f0}.logo{max-height:40px;margin-bottom:16px}h1{font-size:32px;font-weight:700;letter-spacing:-0.02em;color:#0f172a;margin-bottom:8px}.subtitle{font-size:16px;color:#64748b}.meta{font-size:12px;color:#94a3b8;margin-top:12px}.video-section{margin-bottom:40px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}.video-section video{width:100%;display:block;max-height:500px}.step{margin-bottom:40px;background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}.step-header{display:flex;align-items:center;gap:12px;padding:16px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0}.step-num{width:32px;height:32px;border-radius:50%;background:' + brand.primaryColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}.step-title{font-size:16px;font-weight:600}.step-body{padding:20px}.step-screenshot{width:100%;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:16px}.step-description{font-size:15px;color:#475569;line-height:1.7}.step-url{font-size:11px;color:#94a3b8;font-family:monospace;margin-top:8px;padding:4px 8px;background:#f1f5f9;border-radius:4px;display:inline-block}.footer{text-align:center;padding:32px 0;border-top:1px solid #e2e8f0;margin-top:48px;font-size:12px;color:#94a3b8}.toc{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:24px;margin-bottom:40px}.toc h2{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:12px}.toc-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155;text-decoration:none}.toc-item:last-child{border-bottom:none}.toc-item:hover{color:' + brand.primaryColor + '}.toc-num{width:24px;height:24px;border-radius:50%;background:' + brand.primaryColor + '15;color:' + brand.primaryColor + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}' + ctaCss + '@media print{body{background:#fff}.step{break-inside:avoid;box-shadow:none}}</style></head><body><div class="container"><div class="header">' + logoH + '<h1>' + esc(title) + '</h1>' + (subtitle ? '<p class="subtitle">' + esc(subtitle) + '</p>' : '') + '<p class="meta">' + state.steps.length + ' steps \u2022 Generated ' + new Date().toLocaleDateString() + '</p></div>' + videoHtml + '<div class="toc"><h2>Table of Contents</h2>' + tocHtml + '</div>' + stepsHtml + '<div class="footer"><div>Created with StepWise \u2022 ' + esc(brand.name) + ' \u2022 ' + new Date().getFullYear() + '</div></div></div>' + embeddedDataTag + '</body></html>';
 }
 
 async function exportHTML() { var h = await generateHTMLContent(); dlFile(h, slug(document.getElementById("docTitle").value || "doc") + ".html", "text/html"); showToast("HTML exported!"); }
