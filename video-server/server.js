@@ -232,16 +232,21 @@ async function createTitleCard(jobDir, title, description) {
   const clipPath = path.join(jobDir, "title_card.mp4");
   const duration = 3;
 
-  // Escape special characters for FFmpeg drawtext
-  const safeTitle = escapeFFmpegText(title);
-  const safeDesc = escapeFFmpegText(description);
+  // Write the text to files and use FFmpeg's `textfile=` option so we never
+  // have to escape user-supplied characters inside the filter-graph string.
+  // (Inlining `text='...'` with an escape function has historically broken on
+  // certain combinations of `'`, `:`, `=` — producing the "Both text and text
+  // file provided" error. `textfile=` sidesteps that entire class of bugs.)
+  const titlePath = path.join(jobDir, "title_card_title.txt");
+  fs.writeFileSync(titlePath, sanitizeForTextfile(title));
 
-  // Build filter: dark background + centered title + description below
   let filter = "color=c=#1E293B:s=1920x1080:d=" + duration;
-  filter += ",drawtext=text='" + safeTitle + "':fontsize=56:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+  filter += ",drawtext=textfile=" + escapeFilterPath(titlePath) + ":fontsize=56:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
   if (description) {
-    filter += ",drawtext=text='" + safeDesc + "':fontsize=28:fontcolor=#94a3b8:x=(w-text_w)/2:y=(h-text_h)/2+40:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+    const descPath = path.join(jobDir, "title_card_desc.txt");
+    fs.writeFileSync(descPath, sanitizeForTextfile(description));
+    filter += ",drawtext=textfile=" + escapeFilterPath(descPath) + ":fontsize=28:fontcolor=#94a3b8:x=(w-text_w)/2:y=(h-text_h)/2+40:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
   }
 
   // Generate silent audio track (needed for concat to work)
@@ -262,9 +267,16 @@ async function createTitleCard(jobDir, title, description) {
 // STEP CLIP (screenshot + audio + overlays)
 // ============================================================
 async function createStepClip(imgPath, audioPath, clipPath, stepNum, stepTitle, description, duration) {
-  // Escape text for FFmpeg
-  const safeStepLabel = escapeFFmpegText("Step " + stepNum);
-  const safeDesc = escapeFFmpegText(truncateText(description, 80));
+  const jobDir = path.dirname(clipPath);
+
+  // Write label + subtitle text to .txt files and feed them to FFmpeg via
+  // `textfile=`. This avoids escaping user-supplied content inside the
+  // filter-graph string, which is what was producing the
+  // "Both text and text file provided" error on arbitrary descriptions.
+  const labelPath = path.join(jobDir, "step_" + stepNum + "_label.txt");
+  const descPath  = path.join(jobDir, "step_" + stepNum + "_desc.txt");
+  fs.writeFileSync(labelPath, sanitizeForTextfile("Step " + stepNum));
+  fs.writeFileSync(descPath,  sanitizeForTextfile(truncateText(description, 80)));
 
   // Video filter:
   // 1. Scale image to fit 1920x1080 (keep aspect ratio, pad with dark bg)
@@ -273,10 +285,10 @@ async function createStepClip(imgPath, audioPath, clipPath, stepNum, stepTitle, 
   let vf = "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=#1E293B,format=yuv420p";
 
   // Step number overlay (top-left badge)
-  vf += ",drawtext=text='" + safeStepLabel + "':fontsize=32:fontcolor=white:x=30:y=25:box=1:boxcolor=#2563EB@0.85:boxborderw=12:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+  vf += ",drawtext=textfile=" + escapeFilterPath(labelPath) + ":fontsize=32:fontcolor=white:x=30:y=25:box=1:boxcolor=#2563EB@0.85:boxborderw=12:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
   // Subtitle bar at bottom
-  vf += ",drawtext=text='" + safeDesc + "':fontsize=26:fontcolor=white:x=(w-text_w)/2:y=h-65:box=1:boxcolor=black@0.65:boxborderw=14:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+  vf += ",drawtext=textfile=" + escapeFilterPath(descPath) + ":fontsize=26:fontcolor=white:x=(w-text_w)/2:y=h-65:box=1:boxcolor=black@0.65:boxborderw=14:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
   await runFFmpeg([
     "-loop", "1",
@@ -382,6 +394,29 @@ function escapeFFmpegText(text) {
     .replace(/:/g, "\\\\:")
     .replace(/%/g, "%%")
     .replace(/\n/g, " ");
+}
+
+// Clean up text that will be written to a textfile and rendered by drawtext.
+// drawtext reads the file raw, so the only things we need to worry about are
+// control characters and percent-expansion (%{...}).
+function sanitizeForTextfile(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/[\r\n\t]+/g, " ")   // collapse newlines/tabs to spaces
+    .replace(/%/g, "%%")           // disable drawtext's %{...} expansion
+    .replace(/[\x00-\x1F\x7F]/g, "") // strip remaining control chars
+    .trim();
+}
+
+// Escape a filesystem path for inclusion in an FFmpeg filter-graph option
+// value. We only need to escape characters that terminate option parsing:
+// `:` (option separator), `\` (escape char), and `'` (quote). This is the
+// same escape recommended in FFmpeg docs for `textfile=` and `fontfile=`.
+function escapeFilterPath(p) {
+  return String(p)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/:/g, "\\:");
 }
 
 function truncateText(text, maxLen) {
