@@ -748,6 +748,66 @@ var server = http.createServer(async function(req, res) {
     return;
   }
 
+  // === BOOTSTRAP: ONE-TIME endpoint to copy /opt/stepwise-video files into GitHub ===
+  // REMOVE THIS BLOCK after the video-server folder lands in the repo.
+  // Skips ghl-config.json (contains PIT token), node_modules, and files > 5MB.
+  if (req.method === "GET" && req.url.split("?")[0] === "/bootstrap-video-files") {
+    var bootstrapSecret = "bootstrap-ebc3335781749d4df942eaed478f1cb7";
+    var auth = req.headers["authorization"] || "";
+    if (auth !== "Bearer " + bootstrapSecret) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unauthorized" }));
+      return;
+    }
+    try {
+      var videoDir = "/opt/stepwise-video";
+      if (!fs.existsSync(videoDir)) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Directory not found", path: videoDir }));
+        return;
+      }
+      var result = { files: {}, skipped: [] };
+      var entries = fs.readdirSync(videoDir, { withFileTypes: true });
+      for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        var entryName = entry.name;
+        if (entry.isDirectory()) {
+          result.skipped.push(entryName + " (directory)");
+          continue;
+        }
+        if (entryName === "ghl-config.json") {
+          result.skipped.push(entryName + " (sensitive - excluded)");
+          continue;
+        }
+        if (entryName === "package-lock.json") {
+          result.skipped.push(entryName + " (regeneratable)");
+          continue;
+        }
+        if (entryName.endsWith(".log")) {
+          result.skipped.push(entryName + " (log file)");
+          continue;
+        }
+        var fullPath = path.join(videoDir, entryName);
+        var stat = fs.statSync(fullPath);
+        if (stat.size > 5 * 1024 * 1024) {
+          result.skipped.push(entryName + " (> 5MB)");
+          continue;
+        }
+        try {
+          result.files[entryName] = fs.readFileSync(fullPath, "utf8");
+        } catch (readErr) {
+          result.skipped.push(entryName + " (read error: " + readErr.message + ")");
+        }
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // === REBUILD INDEX: Force-regenerate user's index page ===
   if (req.method === "POST" && req.url === "/rebuild-index") {
     var authResult = await authenticateUser(req);
