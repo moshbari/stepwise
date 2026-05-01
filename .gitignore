@@ -4,3 +4,4 @@ deploy-config.json
 users.json
 *.bak
 .DS_Store
+stepwise-extension-v*.zip

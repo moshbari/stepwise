@@ -2,11 +2,11 @@
 # Deploy StepWise Downloads Page
 # Run from the stepwise project root: bash server/deploy-downloads.sh
 # Usage: bash server/deploy-downloads.sh [version]
-# Example: bash server/deploy-downloads.sh v2.4.5
+# Example: bash server/deploy-downloads.sh v3.0.0
 
 set -e
 
-VERSION="${1:-v2.4.6}"
+VERSION="${1:-v3.0.0}"
 REMOTE="root@109.205.182.135"
 REMOTE_DIR="/home/heychatmate/web/app.heychatmate.com/public_html/public/stepwise/downloads"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

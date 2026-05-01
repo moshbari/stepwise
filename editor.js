@@ -19,10 +19,14 @@ var state = {
 
 var pendingScreenshotStepId = null;
 var annoState = {};
+// Tracks the natural (intrinsic) screenshot pixel dimensions per step.
+// Populated lazily when canvases are initialized. Used to scale annotation
+// coordinates to a display-size-independent space when serializing.
+var stepNaturalDims = {};
 var currentTool = "circle";
 var currentColor = "#ef4444";
 var currentSize = 3;
-window._blurIntensity = 10;
+window._blurIntensity = 3;
 window._stepnumPrefix = "Step-";
 window._stepnumCounter = {}; // per-step counters
 
@@ -522,11 +526,19 @@ function renderEditor() {
       '<option value="5"' + (currentSize===5?' selected':'') + '>Thick</option>' +
       '<option value="8"' + (currentSize===8?' selected':'') + '>Extra</option></select>';
 
-    // Blur intensity control (only visible when blur tool active)
+    // Blur intensity control. Visible whenever the blur tool is active. If
+    // an existing blur is currently selected on this step's canvas, the slider
+    // is bound to *that* blur's intensity (drag = edit the selected blur).
+    // Otherwise the slider sets the default intensity for the next new blur.
+    var blurSliderVal = window._blurIntensity || 3;
+    var hasSelectedBlur = (as && as.selectedIndex >= 0 &&
+                          as.shapes[as.selectedIndex] &&
+                          as.shapes[as.selectedIndex].type === "blur");
+    if (hasSelectedBlur) blurSliderVal = as.shapes[as.selectedIndex].intensity || blurSliderVal;
     tb += '<span class="blur-controls" style="display:' + (currentTool === "blur" ? "inline-flex" : "none") + ';align-items:center;gap:4px;">' +
-      '<span style="font-size:10px;color:var(--text-3);">Blur:</span>' +
-      '<input type="range" class="blur-intensity-slider" min="3" max="25" value="' + (window._blurIntensity || 10) + '" style="width:60px;height:16px;">' +
-      '<span class="blur-val" style="font-size:10px;color:var(--text-3);min-width:22px;">' + (window._blurIntensity || 10) + 'px</span></span>';
+      '<span style="font-size:10px;color:var(--text-3);">Blur' + (hasSelectedBlur ? ' (editing)' : '') + ':</span>' +
+      '<input type="range" class="blur-intensity-slider" min="3" max="25" value="' + blurSliderVal + '" style="width:60px;height:16px;">' +
+      '<span class="blur-val" style="font-size:10px;color:var(--text-3);min-width:22px;">' + blurSliderVal + 'px</span></span>';
 
     // Step number prefix control (only visible when stepnum tool active)
     tb += '<span class="stepnum-controls" style="display:' + (currentTool === "stepnum" ? "inline-flex" : "none") + ';align-items:center;gap:4px;">' +
@@ -637,12 +649,26 @@ function renderEditor() {
     });
   });
 
-  // Blur intensity slider
+  // Blur intensity slider — edits the selected blur shape if there is one,
+  // otherwise sets the default intensity for the next new blur.
   editor.querySelectorAll(".blur-intensity-slider").forEach(function(sl) {
     sl.addEventListener("input", function() {
-      window._blurIntensity = parseInt(sl.value);
+      var v = parseInt(sl.value, 10);
+      if (!isFinite(v) || v < 1) v = 3;
+      window._blurIntensity = v;
       var valSpan = sl.parentElement.querySelector(".blur-val");
-      if (valSpan) valSpan.textContent = sl.value + "px";
+      if (valSpan) valSpan.textContent = v + "px";
+      // If a blur shape is selected on any canvas, update its intensity
+      // live so the user sees the change while dragging the slider.
+      Object.keys(annoState).forEach(function(sid) {
+        var as = annoState[sid];
+        if (as && as.selectedIndex >= 0 && as.shapes[as.selectedIndex] &&
+            as.shapes[as.selectedIndex].type === "blur") {
+          as.shapes[as.selectedIndex].intensity = v;
+          saveShapes(sid);
+          redrawShapes(sid);
+        }
+      });
     });
   });
 
@@ -681,11 +707,20 @@ function renderEditor() {
   editor.querySelectorAll(".acolor").forEach(function(inp) {
     inp.addEventListener("input", function() {
       currentColor = inp.value;
-      // If an object is selected, update its color
+      // If an object is selected, update its visible color. Step numbers and
+      // callouts expose bgColor (the badge fill) as the user-visible color;
+      // their `color` field is the white text fill and is left alone unless
+      // the user explicitly edits text styling. Other shapes (circle / rect /
+      // arrow / pen / blur border) use the standard `color` field.
       Object.keys(annoState).forEach(function(sid) {
         var as = annoState[sid];
         if (as && as.selectedIndex >= 0 && as.shapes[as.selectedIndex]) {
-          as.shapes[as.selectedIndex].color = currentColor;
+          var sh = as.shapes[as.selectedIndex];
+          if (sh.type === "stepnum" || sh.type === "callout") {
+            sh.bgColor = currentColor;
+          } else {
+            sh.color = currentColor;
+          }
           saveShapes(sid);
           redrawShapes(sid);
         }
@@ -844,17 +879,60 @@ function initCanvases() {
       canvas.style.height = rect.height + "px";
 
       var as = getAS(sid);
+      var hadShapes = Array.isArray(as.shapes) && as.shapes.length > 0;
+      var oldImgW = as.imgW || 0;
+      var oldImgH = as.imgH || 0;
+
       as.canvas = canvas;
       as.ctx = canvas.getContext("2d");
       as.imgW = rect.width;
       as.imgH = rect.height;
 
-      // Restore saved annotations
+      // Cache the screenshot's intrinsic pixel dimensions for this step so
+      // save / load routines can convert annotation coords to a stable
+      // (display-size-independent) coordinate space.
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        stepNaturalDims[sid] = { w: img.naturalWidth, h: img.naturalHeight };
+      }
+
+      // Restore saved annotations. If the saved shapes are in natural-image
+      // pixel space (coordSpace === "natural") we rescale them to whatever
+      // display size the canvas is currently using, then mark the step as
+      // back-in-display-space so subsequent saves can convert again.
       var step = state.steps.find(function(s) { return s.id === sid; });
-      if (step && step.annotations && step.annotations.length > 0 && as.shapes.length === 0) {
-        as.shapes = step.annotations.slice();
-        as.history = [[], as.shapes.slice()];
+      if (step && Array.isArray(step.annotations) && step.annotations.length > 0 && !hadShapes) {
+        var loaded = JSON.parse(JSON.stringify(step.annotations));
+        if (step.coordSpace === "natural" && img.naturalWidth > 0 && img.naturalHeight > 0) {
+          var sxLoad = rect.width / img.naturalWidth;
+          var syLoad = rect.height / img.naturalHeight;
+          scaleShapesInPlace(loaded, sxLoad, syLoad);
+        }
+        as.shapes = loaded;
+        as.history = [[], loaded.slice()];
         as.historyIndex = 1;
+        // Keep step.annotations consistent with the live in-memory shapes
+        // (now in display-pixel space) so other code paths see one format.
+        step.annotations = JSON.parse(JSON.stringify(loaded));
+        delete step.coordSpace;
+      } else if (hadShapes && oldImgW > 0 && oldImgH > 0 &&
+                 (Math.abs(oldImgW - rect.width) > 0.5 || Math.abs(oldImgH - rect.height) > 0.5)) {
+        // The canvas was previously initialized at a different display size
+        // (e.g. window resize, sidebar toggle, re-render). Rescale the live
+        // shapes from the previous display size to the new one so they stay
+        // anchored to the same point on the screenshot.
+        var rsx = rect.width / oldImgW;
+        var rsy = rect.height / oldImgH;
+        scaleShapesInPlace(as.shapes, rsx, rsy);
+        // Also rescale the history snapshots so undo doesn't snap back
+        // to the old coordinate space.
+        if (Array.isArray(as.history)) {
+          as.history = as.history.map(function(snap) {
+            var c = JSON.parse(JSON.stringify(snap || []));
+            scaleShapesInPlace(c, rsx, rsy);
+            return c;
+          });
+        }
+        saveShapes(sid);
       }
 
       redrawShapes(sid);
@@ -1026,7 +1104,15 @@ function onDown(e, sid) {
       as.startX = pos.x;
       as.startY = pos.y;
       var sel = as.shapes[hitIdx];
-      if (sel.color) { currentColor = sel.color; document.querySelectorAll(".acolor").forEach(function(c) { c.value = sel.color; }); }
+      // For step numbers and callouts the user-visible "color" is the badge
+      // background (bgColor), not the white text fill. Sync the toolbar's
+      // color picker from the visible color so that creating the next shape
+      // — or changing the picker afterwards — doesn't accidentally turn the
+      // shape white.
+      var visibleColor = (sel.type === "stepnum" || sel.type === "callout")
+        ? (sel.bgColor || sel.color)
+        : sel.color;
+      if (visibleColor) { currentColor = visibleColor; document.querySelectorAll(".acolor").forEach(function(c) { c.value = visibleColor; }); }
       if (sel.size) { currentSize = sel.size; document.querySelectorAll(".asize").forEach(function(s) { s.value = String(sel.size); }); }
       redrawShapes(sid);
       render();
@@ -1541,6 +1627,83 @@ function syncAllAnnotationsToState() {
   });
 }
 
+// Scales every coordinate / dimension field on each shape in place by (sx, sy).
+// Stroke / radius / fontSize use the average of the two scales so they stay
+// visually consistent. Blur intensity is treated as a logical value that
+// matches the slider (display pixels) and is intentionally NOT scaled here —
+// see prepareStepsForSave for how it's handled at serialization time.
+function scaleShapesInPlace(shapes, sx, sy) {
+  if (!Array.isArray(shapes)) return;
+  if (!isFinite(sx) || !isFinite(sy) || sx <= 0 || sy <= 0) return;
+  if (sx === 1 && sy === 1) return;
+  var avg = (sx + sy) / 2;
+  shapes.forEach(function(s) {
+    if (!s || typeof s !== "object") return;
+    if (typeof s.cx === "number") s.cx *= sx;
+    if (typeof s.cy === "number") s.cy *= sy;
+    if (typeof s.rx === "number") s.rx *= sx;
+    if (typeof s.ry === "number") s.ry *= sy;
+    if (typeof s.x === "number") s.x *= sx;
+    if (typeof s.y === "number") s.y *= sy;
+    if (typeof s.w === "number") s.w *= sx;
+    if (typeof s.h === "number") s.h *= sy;
+    if (typeof s.x1 === "number") s.x1 *= sx;
+    if (typeof s.y1 === "number") s.y1 *= sy;
+    if (typeof s.x2 === "number") s.x2 *= sx;
+    if (typeof s.y2 === "number") s.y2 *= sy;
+    if (typeof s.arrowX === "number") s.arrowX *= sx;
+    if (typeof s.arrowY === "number") s.arrowY *= sy;
+    if (Array.isArray(s.points)) {
+      s.points = s.points.map(function(p) {
+        return { x: (p && typeof p.x === "number" ? p.x * sx : 0),
+                 y: (p && typeof p.y === "number" ? p.y * sy : 0) };
+      });
+    }
+    if (typeof s.size === "number") s.size *= avg;
+    if (typeof s.radius === "number") s.radius *= avg;
+    if (typeof s.fontSize === "number") s.fontSize *= avg;
+  });
+}
+
+// Returns a deep clone of state.steps where each step's annotations have been
+// converted from the live display-pixel space (relative to as.imgW / as.imgH)
+// to the natural-image pixel space (relative to the screenshot's intrinsic
+// dimensions). Each converted step is tagged with coordSpace: "natural" so
+// the loader knows to scale them back to whatever display size is in use
+// when the file is reopened. Steps that lack the dimension info needed for
+// conversion are saved as-is (with no coordSpace tag) for backwards compat.
+function prepareStepsForSave() {
+  syncAllAnnotationsToState();
+  return state.steps.map(function(step) {
+    var copy = JSON.parse(JSON.stringify(step));
+    var dims = stepNaturalDims[step.id];
+    var as = annoState[step.id];
+    var imgW = as ? as.imgW : 0;
+    var imgH = as ? as.imgH : 0;
+    var hasAnnotations = Array.isArray(copy.annotations) && copy.annotations.length > 0;
+    var hasNaturalDims = dims && dims.w > 0 && dims.h > 0;
+    var hasDisplayDims = imgW > 0 && imgH > 0;
+
+    if (hasAnnotations && hasNaturalDims && hasDisplayDims) {
+      // Live shapes are in display-pixel space; convert to natural-image
+      // pixel space so they're stable across reloads at any display size.
+      var sx = dims.w / imgW;
+      var sy = dims.h / imgH;
+      scaleShapesInPlace(copy.annotations, sx, sy);
+      copy.coordSpace = "natural";
+    } else if (hasAnnotations && step.coordSpace === "natural") {
+      // The step was loaded from disk but its canvas was never initialized
+      // (user didn't scroll to it before saving), so its annotations are
+      // still in natural-image space. Round-trip them unchanged.
+      copy.coordSpace = "natural";
+    } else {
+      // Legacy save (no normalization possible) — leave coords as-is.
+      delete copy.coordSpace;
+    }
+    return copy;
+  });
+}
+
 function undoAnnotation(sid) {
   var as = getAS(sid);
   if (!as || as.historyIndex <= 0) return;
@@ -1671,43 +1834,71 @@ function redrawShapes(sid) {
 }
 
 // --- Blur Box Drawing ---
+//
+// Renders a true Gaussian blur preview on the editor canvas (matching the
+// exported result) instead of a stylized stripey overlay. The annotation
+// canvas sits *on top of* the screenshot <img>, so we composite the image
+// (plus any annotations already drawn beneath this one) into a temp canvas,
+// apply ctx.filter = "blur(...)", then clip-draw the blurred composite back
+// into this shape's rectangle.
 
 function drawBlurBox(ctx, as, shape, isSelected) {
-  // Get image data from the underlying screenshot
-  var step = state.steps.find(function(s) { return s.id && annoState[s.id] === as; });
-  var imgEl = as.canvas.parentElement ? as.canvas.parentElement.querySelector("img") : null;
+  var canvas = as.canvas;
+  var imgEl = canvas && canvas.parentElement ? canvas.parentElement.querySelector("img") : null;
 
   var x = Math.round(shape.x), y = Math.round(shape.y);
   var w = Math.round(shape.w), h = Math.round(shape.h);
-  var intensity = shape.intensity || 10;
+  var intensity = Math.max(1, shape.intensity || 10);
 
-  // Draw semi-transparent overlay to indicate blur
-  ctx.fillStyle = "rgba(128, 128, 128, 0.3)";
-  roundRect(ctx, x, y, w, h, 4);
-  ctx.fill();
+  var canDrawRealBlur = !!(imgEl && imgEl.complete && imgEl.naturalWidth > 0 &&
+                           canvas && canvas.width > 0 && canvas.height > 0 &&
+                           w > 0 && h > 0);
 
-  // Simulate blur with multiple semi-transparent layers
-  ctx.fillStyle = "rgba(200, 200, 200, 0.15)";
-  for (var i = 0; i < Math.min(intensity, 15); i++) {
-    var offset = i * 0.8;
-    roundRect(ctx, x + offset, y + offset, w - offset * 2, h - offset * 2, 4);
-    ctx.fill();
+  if (canDrawRealBlur) {
+    try {
+      // Build a composite of (screenshot + previously-drawn annotations) the
+      // same size as the canvas. Drawing the canvas into itself via a temp
+      // canvas is allowed because the temp is a separate bitmap.
+      var tc = document.createElement("canvas");
+      tc.width = canvas.width;
+      tc.height = canvas.height;
+      var tctx = tc.getContext("2d");
+      // 1) The underlying screenshot, scaled to the canvas's display size.
+      tctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+      // 2) Any earlier annotations that have already been drawn onto the
+      //    main canvas (this matches the export behaviour).
+      tctx.drawImage(canvas, 0, 0);
+
+      ctx.save();
+      // Clip to the (rounded) blur rectangle so the blur affects only the
+      // selected region.
+      ctx.beginPath();
+      roundRect(ctx, x, y, w, h, 4);
+      ctx.clip();
+      ctx.filter = "blur(" + intensity + "px)";
+      ctx.drawImage(tc, 0, 0);
+      ctx.filter = "none";
+      ctx.restore();
+    } catch (err) {
+      // Some browsers (or edge cases like cross-origin images) may throw —
+      // fall back to a solid translucent fill so the redaction is still
+      // clearly indicated.
+      canDrawRealBlur = false;
+    }
   }
 
-  // Blur pattern lines
-  ctx.strokeStyle = "rgba(150, 150, 150, 0.4)";
-  ctx.lineWidth = 1;
-  for (var ly = y + 3; ly < y + h - 3; ly += 4) {
-    ctx.beginPath();
-    ctx.moveTo(x + 3, ly);
-    ctx.lineTo(x + w - 3, ly);
-    ctx.stroke();
+  if (!canDrawRealBlur) {
+    ctx.save();
+    ctx.fillStyle = "rgba(60, 60, 60, 0.78)";
+    roundRect(ctx, x, y, w, h, 4);
+    ctx.fill();
+    ctx.restore();
   }
 
   // Border
-  ctx.strokeStyle = isSelected ? "#3b82f6" : "rgba(100, 100, 100, 0.5)";
+  ctx.strokeStyle = isSelected ? "#3b82f6" : "rgba(0, 0, 0, 0.25)";
   ctx.lineWidth = isSelected ? 2 : 1;
-  ctx.setLineDash(isSelected ? [6, 4] : [4, 3]);
+  ctx.setLineDash(isSelected ? [6, 4] : []);
   roundRect(ctx, x, y, w, h, 4);
   ctx.stroke();
   ctx.setLineDash([]);
@@ -3280,17 +3471,19 @@ async function quickSaveProject() {
 }
 
 async function writeProjectToHandle(handle) {
-  // Flush live canvas shapes into step.annotations first.
-  syncAllAnnotationsToState();
+  // Flush live canvas shapes into step.annotations and convert coords to
+  // natural-image pixel space so positions are stable across reloads at any
+  // display size.
+  var stepsForSave = prepareStepsForSave();
   var projectData = {
     format: "stepwise-project",
-    version: "1.4",
+    version: "1.5",
     title: document.getElementById("docTitle").value || "",
     subtitle: document.getElementById("docSubtitle").value || "",
     brand: state.brand,
     cta: ctaState,
     videoUrl: state.videoUrl || null,
-    steps: state.steps,
+    steps: stepsForSave,
     savedAt: new Date().toISOString()
   };
 
@@ -3514,14 +3707,14 @@ function resetProjectState() {
   var sue = document.getElementById("shareUrlInput"); if (sue) sue.value = "";
   if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
   ttsPlayingSid = null; ttsPlayAllMode = false; ttsPlayAllIndex = 0; ttsAudioCache = {};
-  annoState = {}; window._stepnumCounter = {}; pendingScreenshotStepId = null;
+  annoState = {}; stepNaturalDims = {}; window._stepnumCounter = {}; pendingScreenshotStepId = null;
   // Reset CTA
   ctaState = { enabled: false, btnText: "Get Started Now", btnUrl: "", pretext: "", color: "blue" };
   restoreCtaUI();
 }
 function handleJSONImport(e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function(ev) { try { var d = JSON.parse(ev.target.result); if (d.steps) { resetProjectState(); state.steps = d.steps; state.steps.forEach(function(s) { if (!s.annotations) s.annotations = []; }); state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null; showEditor(); render(); showToast("Imported " + state.steps.length + " steps"); } } catch(ex) { alert("Invalid JSON: " + ex.message); } }; r.readAsText(f); }
 function handleDrop(e) { e.preventDefault(); e.currentTarget.classList.remove("dragover"); var f = e.dataTransfer.files[0]; if (f && f.name.endsWith(".json")) { var r = new FileReader(); r.onload = function(ev) { try { var d = JSON.parse(ev.target.result); if (d.steps) { resetProjectState(); state.steps = d.steps; state.activeStepId = state.steps.length > 0 ? state.steps[0].id : null; showEditor(); render(); } } catch(ex) { alert("Invalid JSON"); } }; r.readAsText(f); } }
-function exportJSONFile() { var d = { version: "1.0", title: state.title, brand: state.brand, exportedAt: new Date().toISOString(), steps: state.steps }; dlFile(JSON.stringify(d, null, 2), "stepwise-" + slug(state.title) + ".json", "application/json"); showToast("JSON exported!"); }
+function exportJSONFile() { var d = { version: "1.5", title: state.title, brand: state.brand, exportedAt: new Date().toISOString(), steps: prepareStepsForSave() }; dlFile(JSON.stringify(d, null, 2), "stepwise-" + slug(state.title) + ".json", "application/json"); showToast("JSON exported!"); }
 
 // ============================================================
 // CLOUD SAVE / LOAD / IMPORT FROM PUBLISHED GUIDE
@@ -3531,9 +3724,9 @@ async function saveToCloud() {
   if (!(await ensureApiKey())) return;
   if (state.steps.length === 0) { showToast("No steps to save"); return; }
 
-  // CRITICAL: Flush live canvas shapes into step.annotations before serializing,
-  // otherwise in-progress annotations never make it to the cloud.
-  syncAllAnnotationsToState();
+  // CRITICAL: Flush live canvas shapes and convert annotation coords to
+  // natural-image space before serializing.
+  var stepsForSave = prepareStepsForSave();
 
   var btn = document.getElementById("saveCloudBtn");
   btn.disabled = true;
@@ -3543,13 +3736,13 @@ async function saveToCloud() {
     var title = document.getElementById("docTitle").value || "Untitled Guide";
     var projectData = {
       format: "stepwise-project",
-      version: "1.4",
+      version: "1.5",
       title: title,
       subtitle: document.getElementById("docSubtitle").value || "",
       brand: state.brand,
       cta: ctaState,
       videoUrl: state.videoUrl || null,
-      steps: state.steps,
+      steps: stepsForSave,
       savedAt: new Date().toISOString()
     };
 
@@ -3585,17 +3778,17 @@ async function saveToCloud() {
 // Background auto-save (called after publish, non-blocking)
 function autoSaveToCloud(titleStr, slugStr) {
   try {
-    // Flush live canvas shapes into step.annotations before sending.
-    syncAllAnnotationsToState();
+    // Flush live canvas shapes and convert coords to natural-image space.
+    var stepsForSave = prepareStepsForSave();
     var projectData = {
       format: "stepwise-project",
-      version: "1.4",
+      version: "1.5",
       title: titleStr,
       subtitle: document.getElementById("docSubtitle").value || "",
       brand: state.brand,
       cta: ctaState,
       videoUrl: state.videoUrl || null,
-      steps: state.steps,
+      steps: stepsForSave,
       savedAt: new Date().toISOString()
     };
 
@@ -3981,8 +4174,9 @@ function importFromPublishedHTML(htmlString) {
 }
 
 async function generateHTMLContent() {
-  // Flush live canvas shapes into step.annotations so the embedded raw
-  // project data reflects the latest edits.
+  // Flush live canvas shapes so the merged screenshots below pick up the
+  // latest edits. The embedded raw project data is built separately below
+  // via prepareStepsForSave() which converts coords to natural-image space.
   syncAllAnnotationsToState();
 
   var title = document.getElementById("docTitle").value || "Documentation";
@@ -3993,16 +4187,18 @@ async function generateHTMLContent() {
 
   // Build the raw project payload that the editor can use to RESTORE EDITABLE
   // annotations when this HTML is later imported. Viewers never see this —
-  // it's a hidden <script type="application/json"> block.
+  // it's a hidden <script type="application/json"> block. Annotation coords
+  // are stored in natural-image pixel space so they survive reloads at any
+  // display size.
   var rawProjectData = {
     format: "stepwise-project",
-    version: "1.4",
+    version: "1.5",
     title: title,
     subtitle: subtitle,
     brand: state.brand,
     cta: ctaState,
     videoUrl: state.videoUrl || null,
-    steps: state.steps, // raw screenshots + separate editable annotations
+    steps: prepareStepsForSave(),
     savedAt: new Date().toISOString()
   };
   // Escape </script> so we never break out of the script tag.

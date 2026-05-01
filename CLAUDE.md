@@ -276,6 +276,9 @@ When ANY file in `extension/` is changed:
 **This is not optional.** The downloads page is how users get the extension. If it's not updated, users won't get the new features.
 
 ### Current Versions
+- **v3.0.0** (May 1, 2026) — Annotation editor overhaul: real Gaussian blur in the editor (matches export), blur boxes are now selectable + intensity-editable after creation, default blur 3px, step number badge color preserved through edits/deletes, annotation positions stable across save/reload at any window size (coords stored in natural-image pixel space, file format bumped to 1.5)
+- **v2.4.6** (Apr 24, 2026) — Cloud projects stay fully editable after save/reload; published HTML embeds raw project data so Import from Published Guide restores editable annotations
+- **v2.4.5** (Apr 23, 2026) — Build-pipeline fix (every prior zip from v2.2.0 to v2.4.4 actually contained v2.2.0 code due to a stale subfolder); version label now auto-reads from manifest; recording bug on GHL fixed
 - **v2.4.4** (Mar 20, 2026) — Patch bump for Chrome Web Store submission
 - **v2.4.3** (Mar 20, 2026) — Major annotation UX overhaul: callout click-to-place flow, step numbers with arrows, in-place move/resize for all tools, smart step numbering with auto re-number, editable step labels
 - **v2.2.0** (Feb 25, 2026) — Fix click capture on GHL workflow pages (early script loading + service worker restart recovery)
